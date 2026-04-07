@@ -56,6 +56,33 @@ export const logsApi = {
   },
 }
 
+// ── Files ─────────────────────────────────────────────────────────────────────
+export const filesApi = {
+  browse: (path: string) => api.get<FilesBrowseResponse>(`/files/browse?path=${encodeURIComponent(path)}`).then(r => r.data),
+  read: (path: string) => api.get<FilesReadResponse>(`/files/read?path=${encodeURIComponent(path)}`).then(r => r.data),
+  write: (path: string, content: string) => api.put(`/files/write?path=${encodeURIComponent(path)}`, { content }).then(r => r.data),
+}
+
+export interface FilesBrowseResponse {
+  path: string
+  entries: FileEntry[]
+  file?: FileEntry
+  error?: string
+}
+
+export interface FileEntry {
+  name: string
+  type: 'file' | 'dir'
+  size: number
+  modified: number
+}
+
+export interface FilesReadResponse {
+  path: string
+  content: string
+  size: number
+}
+
 // ── Profiles ─────────────────────────────────────────────────────────────────
 export const profilesApi = {
   list: () => api.get<{ profiles: Profile[]; active: string | null }>('/profiles').then(r => r.data),
