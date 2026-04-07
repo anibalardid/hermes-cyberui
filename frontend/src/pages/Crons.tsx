@@ -8,6 +8,7 @@ export default function Crons() {
   const qc = useQueryClient()
   const [expanded, setExpanded] = useState<string | null>(null)
   const [viewingJob, setViewingJob] = useState<CronJob | null>(null)
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['crons'],
@@ -22,7 +23,15 @@ export default function Crons() {
 
   const runNowMutation = useMutation({
     mutationFn: (jobId: string) => cronsApi.runNow(jobId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['crons'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['crons'] })
+      setToast({ msg: 'Cron triggered successfully', ok: true })
+      setTimeout(() => setToast(null), 3000)
+    },
+    onError: (err: any) => {
+      setToast({ msg: err?.message || 'Failed to trigger cron', ok: false })
+      setTimeout(() => setToast(null), 4000)
+    },
   })
 
   const { data: jobDetail } = useQuery({
@@ -250,6 +259,28 @@ export default function Crons() {
           </div>
         </div>
       )}
+
+      {/* Toast notification */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 9999,
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
+          padding: '0.75rem 1rem', borderRadius: '0.5rem',
+          background: toast.ok ? 'rgba(0,255,65,0.12)' : 'rgba(255,68,68,0.12)',
+          border: `1px solid ${toast.ok ? 'rgba(0,255,65,0.4)' : 'rgba(255,68,68,0.4)'}`,
+          color: toast.ok ? '#00ff41' : '#ff4444',
+          fontSize: '0.875rem', fontFamily: 'inherit', fontWeight: 500,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+          animation: 'slideUp 0.2s ease',
+        }}>
+          {toast.ok ? <CheckCircle size={16} /> : <XCircle size={16} />}
+          {toast.msg}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
+      `}</style>
     </div>
   )
 }

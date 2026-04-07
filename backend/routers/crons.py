@@ -1,15 +1,18 @@
 """
-Crons router — list, pause/resume, and edit scheduled cron jobs.
+Crons router — list, pause/resume, trigger cron jobs.
 Reads from ~/.hermes/cron/jobs.json
+For triggering runs, calls the Hermes API server at 127.0.0.1:8642.
 """
 import json
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+import urllib.request
 
 router = APIRouter()
 CRON_JOBS_FILE = Path.home() / ".hermes" / "cron" / "jobs.json"
+HERMES_API = "http://127.0.0.1:8642"
 
 
 class UpdateCronJob(BaseModel):
@@ -115,11 +118,28 @@ async def update_cron(job_id: str, data: UpdateCronJob):
 
 @router.post("/{job_id}/run")
 async def run_cron_now(job_id: str):
-    """Trigger a cron job to run immediately (stub — just marks it)."""
+    """Trigger a cron job via the Hermes API server (runs on next scheduler tick, ~60s)."""
+    # Verify job exists first
     cron_data = _load_jobs()
+    job = None
     for j in cron_data.get("jobs", []):
         if j["id"] == job_id:
-            j["last_run_at"] = None  # Will be set by hermes on next run
-            _save_jobs(cron_data)
-            return {"ok": True, "message": "Job triggered"}
-    raise HTTPException(404, "Cron job not found")
+            job = j
+            break
+    if not job:
+        raise HTTPException(404, "Cron job not found")
+
+    # Trigger via Hermes API server
+    try:
+        hermes_req = urllib.request.Request(
+            f"{HERMES_API}/api/jobs/{job_id}/run",
+            method="POST",
+        )
+        hermes_resp = urllib.request.urlopen(hermes_req, timeout=5)
+        response = json.loads(hermes_resp.read())
+        return {"ok": True, "message": response.get("message", "Job triggered")}
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        raise HTTPException(e.code, f"Hermes API error: {body}")
+    except Exception as e:
+        raise HTTPException(502, f"Could not reach Hermes API: {e}")
