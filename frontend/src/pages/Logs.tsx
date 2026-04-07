@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { logsApi } from '../lib/api'
 import { FileText, RefreshCw, Search } from 'lucide-react'
@@ -33,12 +33,20 @@ export default function Logs() {
   const [search, setSearch] = useState('')
   const [offset, setOffset] = useState(0)
   const LIMIT = 300
+  const logBottomRef = useRef<HTMLDivElement>(null)
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['logs', logType, offset, search],
     queryFn: () => logsApi.get(logType, offset, LIMIT, search || undefined),
-    refetchInterval: 30000,
+    refetchInterval: 5000,
   })
+
+  // Auto-scroll to bottom when new data arrives
+  useEffect(() => {
+    if (offset === 0) {
+      logBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [data, offset])
 
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault()
@@ -104,7 +112,7 @@ export default function Logs() {
 
       {/* Log viewer */}
       <div style={{ flex: 1, overflow: 'hidden', borderRadius: '0.5rem', border: '1px solid var(--border)', background: '#050505' }}>
-        <div style={{ height: '100%', overflowY: 'auto', padding: '0.75rem' }}>
+        <div style={{ height: '100%', overflowY: 'auto', padding: '0.75rem' }} ref={logBottomRef}>
           {isLoading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)', fontFamily: 'monospace' }}>Loading...</div>
           ) : data?.lines.length === 0 ? (

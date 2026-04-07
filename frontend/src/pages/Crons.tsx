@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { cronsApi } from '../lib/api'
-import { Clock, Play, Pause, ChevronDown, ChevronRight, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { Clock, Play, Pause, ChevronDown, ChevronRight, CheckCircle, XCircle, AlertTriangle, FileText, Eye, X } from 'lucide-react'
+import type { CronJob } from '../lib/api'
 
 export default function Crons() {
   const qc = useQueryClient()
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [viewingJob, setViewingJob] = useState<CronJob | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['crons'],
@@ -21,6 +23,12 @@ export default function Crons() {
   const runNowMutation = useMutation({
     mutationFn: (jobId: string) => cronsApi.runNow(jobId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['crons'] }),
+  })
+
+  const { data: jobDetail } = useQuery({
+    queryKey: ['cron-detail', viewingJob?.id],
+    queryFn: () => cronsApi.get(viewingJob!.id),
+    enabled: !!viewingJob,
   })
 
   const jobs: any[] = data?.jobs ?? []
@@ -168,6 +176,12 @@ export default function Crons() {
 
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                       <button
+                        onClick={() => setViewingJob(job)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '0.375rem', fontSize: '0.8rem', background: 'rgba(212,0,255,0.08)', color: '#d400ff', border: '1px solid rgba(212,0,255,0.3)', cursor: 'pointer' }}
+                      >
+                        <Eye size={11} />Ver contenido
+                      </button>
+                      <button
                         onClick={() => runNowMutation.mutate(job.id)}
                         disabled={runNowMutation.isPending}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 12px', borderRadius: '0.375rem', fontSize: '0.8rem', background: '#05d9e8', color: '#000', border: '1px solid #05d9e8', cursor: 'pointer' }}
@@ -194,6 +208,46 @@ export default function Crons() {
               </div>
             )
           })}
+        </div>
+      )}
+      {viewingJob && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 50,
+          background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }} onClick={() => setViewingJob(null)}>
+          <div style={{
+            background: 'var(--surf)', border: '1px solid var(--border)', borderRadius: '0.75rem',
+            width: '100%', maxWidth: '700px', maxHeight: '80vh', overflow: 'hidden', display: 'flex', flexDirection: 'column'
+          }} onClick={e => e.stopPropagation()}>
+            {/* Modal header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <FileText size={16} style={{ color: '#d400ff' }} />
+                <div>
+                  <p style={{ fontFamily: 'Orbitron, sans-serif', fontSize: '0.9rem', fontWeight: 600, color: '#d400ff', margin: 0 }}>{jobDetail?.name ?? viewingJob.name}</p>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--muted)', margin: '2px 0 0' }}>{viewingJob.schedule}</p>
+                </div>
+              </div>
+              <button onClick={() => setViewingJob(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '4px' }}>
+                <X size={18} />
+              </button>
+            </div>
+            {/* Modal content */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem' }}>
+              {jobDetail?.script ? (
+                <div style={{ marginBottom: '1rem' }}>
+                  <p style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 0.5rem' }}>Script</p>
+                  <pre style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '0.375rem', padding: '0.75rem', fontSize: '0.75rem', color: '#00ff41', overflowX: 'auto', margin: 0 }}>{jobDetail.script}</pre>
+                </div>
+              ) : null}
+              <div>
+                <p style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 0.5rem' }}>Prompt</p>
+                <pre style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '0.375rem', padding: '0.75rem', fontSize: '0.8rem', color: 'var(--txt)', overflowX: 'auto', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {(jobDetail?.prompt ?? viewingJob.prompt ?? '').trim() || 'Sin prompt configurado.'}
+                </pre>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

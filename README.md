@@ -24,7 +24,18 @@ A cyberpunk-themed web interface for the Hermes Agent framework. Built with Reac
 
 ## Screenshots
 
-The UI features a dark neon aesthetic with color schemes: Matrix Green, Cyber Blue, Amber, Blood, Sunset, and more.
+The UI features a dark neon aesthetic with 8 color schemes (Matrix Green, Cyber Blue, Amber, Blood, Sunset, and more). All screenshots use the default Matrix theme.
+
+| | | |
+|:---:|:---:|:---:|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Sessions](docs/screenshots/sessions.png) | ![Multiagent](docs/screenshots/multiagent.png) |
+| **Dashboard** | **Sessions** | **Multi-Agent** |
+| ![Settings](docs/screenshots/settings.png) | ![Crons](docs/screenshots/crons.png) | ![Logs](docs/screenshots/logs.png) |
+| **Settings** | **Cron Jobs** | **Logs** |
+| ![Skills](docs/screenshots/skills.png) | ![Profiles](docs/screenshots/profiles.png) | ![Plugins](docs/screenshots/plugins.png) |
+| **Skills** | **Profiles** | **Plugins** |
+| ![Memory](docs/screenshots/memory.png) | | |
+| **Memory** | | |
 
 ## Architecture
 

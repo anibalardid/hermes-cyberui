@@ -18,14 +18,9 @@ body{height:100%;margin:0;padding:0;overflow:hidden;font-family:'JetBrains Mono'
   --cyber-bg:var(--bg);--cyber-bg2:var(--bg2);--cyber-surface:var(--surf);--cyber-border:var(--border);
   --cyber-text:var(--txt);--cyber-muted:var(--muted);--cyber-primary:var(--primary);
   --cyber-accent:var(--accent);--cyber-pink:var(--pink);--cyber-danger:var(--danger);--cyber-warning:var(--warning);
-}
-  /* ── Message bubbles (theme-aware) ─────────────────────────────────────────── */
-  --msg-user-bg:rgba(5,217,232,0.08);
-  --msg-user-border:rgba(5,217,232,0.2);
-  --msg-user-text:var(--txt);
-  --msg-assistant-bg:rgba(0,255,65,0.06);
-  --msg-assistant-border:rgba(0,255,65,0.15);
-  --msg-assistant-text:#c0f0c0;
+  /* Message bubbles */
+  --msg-user-bg:rgba(5,217,232,0.08);--msg-user-border:rgba(5,217,232,0.2);--msg-user-text:var(--txt);
+  --msg-assistant-bg:rgba(0,255,65,0.06);--msg-assistant-border:rgba(0,255,65,0.15);--msg-assistant-text:#c0f0c0;
 }
 .theme-light{
   --bg:#f0f0f0;--bg2:#e0e0e0;--surf:#ffffff;--border:#cccccc;
@@ -288,42 +283,28 @@ body{height:100%;margin:0;padding:0;overflow:hidden;font-family:'JetBrains Mono'
 .theme-light{color-scheme:light}
 .theme-light ::-webkit-scrollbar-track{background:#e0e0e0}
 .theme-light ::-webkit-scrollbar-thumb{background:#aaaaaa}
-.theme-light .card{background:#ffffff;border-color:#cccccc}
-.theme-light .card:hover{border-color:#00aa2a;box-shadow:0 0 12px rgba(0,170,42,0.15)}
-.theme-light .stat-card,.theme-light .input,.theme-light .select{background:#ffffff;border-color:#cccccc;color:#111111}
-.theme-light .table{color:#111111}
-.theme-light .table th{color:#888888;background:#f0f0f0}
-.theme-light .table tr:hover td{background:#f5f5f5}
-.theme-light .badge-green,.theme-light .badge-blue,.theme-light .badge-purple{color:#111111}
+.theme-light .card,.theme-light .stat-card{background:#ffffff}
+.theme-light .input,.theme-light textarea,.theme-light .select{background:#ffffff;border-color:#cccccc;color:#111111}
 .theme-light .btn{border-color:#cccccc;color:#111111;background:#ffffff}
 .theme-light .btn:hover{border-color:#00aa2a;color:#00aa2a}
 .theme-light .btn-primary{background:#00aa2a;color:#ffffff;border-color:#00aa2a}
 .theme-light .btn-primary:hover{background:#008822}
 .theme-light .btn-sm{background:#f0f0f0;color:#111111;border-color:#cccccc}
 .theme-light .btn-sm:hover{background:#e0e0e0}
-/* Chat input area */
-.theme-light .chat-input,.theme-light textarea{background:#ffffff;color:#111111;border-color:#cccccc}
-/* Message bubbles */
-.theme-light .msg-user{background:rgba(0,136,204,0.1);border-color:rgba(0,136,204,0.25);color:#111111}
-.theme-light .msg-assistant{background:rgba(0,170,42,0.08);border-color:rgba(0,170,42,0.2);color:#111111}
-/* Section titles */
+.theme-light .table{color:#111111}
+.theme-light .table th{color:#888888;background:#f0f0f0}
+.theme-light .table tr:hover td{background:#f5f5f5}
 .theme-light .section-title,.theme-light .stat-label{color:#888888}
-/* Progress bar */
 .theme-light .progress{background:#e0e0e0}
-/* Links */
 .theme-light a{color:#0088cc}
-/* Cron cards */
-.theme-light .cron-card{background:#ffffff;border-color:#cccccc}
-/* Settings gateway badge */
-.theme-light .badge{color:#111111}
-/* Crons shimmer loading */
-.theme-light [style*="#12121f"]{background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%)!important;background-size:200% 100%!important}
-/* Stat cards in light */
-.theme-light .stat-card{background:#ffffff}
-.theme-light .stat-card:hover{border-color:#00aa2a}
-/* Modal/dialog */
-.theme-light .modal{background:#ffffff;border-color:#cccccc}
-/* Scrollable areas */
 .theme-light .overflow-y-auto{scrollbar-color:#aaaaaa #e0e0e0}
-/* Activity sidebar in light */
-.theme-light [style*="--cyber-surface"]{--cyber-surface:#ffffff;--cyber-border:#cccccc;--cyber-bg:#f0f0f0}
+.theme-light .scanlines{background:repeating-linear-gradient(0deg,rgba(0,0,0,0.03) 0px,rgba(0,0,0,0.03) 1px,transparent 1px,transparent 2px)}
+/* Message bubbles — explicit classes */
+.theme-light .msg-user{background:rgba(0,136,204,0.1);border-color:rgba(0,136,204,0.25);color:#111111}
+.theme-light .msg-assistant{background:rgba(0,170,42,0.08);border-color:rgba(0,170,42,0.2);color:#004400}
+/* Stat card stat labels */
+.theme-light .stat-label{color:#888888}
+/* Badge overrides in light */
+.theme-light .badge-green{background:rgba(0,170,42,0.1);color:#004400;border-color:rgba(0,170,42,0.3)}
+.theme-light .badge-blue{background:rgba(0,136,204,0.1);color:#004488;border-color:rgba(0,136,204,0.3)}
+.theme-light .badge-purple{background:rgba(136,0,204,0.1);color:#440066;border-color:rgba(136,0,204,0.3)}

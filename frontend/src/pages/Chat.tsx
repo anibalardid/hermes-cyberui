@@ -63,6 +63,7 @@ export default function Chat() {
     queryKey: ['session', id],
     queryFn: () => sessionsApi.get(id!),
     enabled: !!id,
+    refetchInterval: 5000,
   })
 
   useEffect(() => {
@@ -211,18 +212,18 @@ export default function Chat() {
                 <div key={i} className="space-y-1">
                   <div
                     className="text-xs px-1 font-display tracking-widest"
-                    style={{ color: msg.role === 'user' ? 'var(--cyber-accent)' : 'var(--cyber-primary)' }}
+                    style={{ color: msg.role === 'user' ? 'var(--accent)' : 'var(--primary)' }}
                   >
                     {msg.role === 'user' ? 'USER' : msg.role === 'assistant' ? 'HERMES' : msg.role.toUpperCase()}
                   </div>
                   <div
                     className="rounded px-3 py-2"
                     style={{
-                      background: msg.role === 'user' ? 'rgba(5,217,232,0.08)' : 'rgba(0,255,65,0.06)',
-                      border: `1px solid ${msg.role === 'user' ? 'rgba(5,217,232,0.2)' : 'rgba(0,255,65,0.15)'}`,
+                      background: msg.role === 'user' ? 'var(--msg-user-bg)' : 'var(--msg-assistant-bg)',
+                      border: `1px solid ${msg.role === 'user' ? 'var(--msg-user-border)' : 'var(--msg-assistant-border)'}`,
                     }}
                   >
-                    <p className="whitespace-pre-wrap" style={{ color: msg.role === 'user' ? 'var(--cyber-text)' : '#c0f0c0', fontSize: '13px' }}>
+                    <p className="whitespace-pre-wrap" style={{ color: msg.role === 'user' ? 'var(--msg-user-text)' : 'var(--msg-assistant-text)', fontSize: '13px' }}>
                       {msg.content}
                     </p>
                   </div>
@@ -231,14 +232,14 @@ export default function Chat() {
 
               {streaming && streamText && (
                 <div className="space-y-1">
-                  <div className="text-xs px-1 font-display tracking-widest" style={{ color: 'var(--cyber-primary)' }}>
+                  <div className="text-xs px-1 font-display tracking-widest" style={{ color: 'var(--primary)' }}>
                     HERMES
                   </div>
                   <div
                     className="rounded px-3 py-2"
-                    style={{ background: 'rgba(0,255,65,0.06)', border: '1px solid rgba(0,255,65,0.15)' }}
+                    style={{ background: 'var(--msg-assistant-bg)', border: '1px solid var(--msg-assistant-border)' }}
                   >
-                    <p className="whitespace-pre-wrap" style={{ color: '#c0f0c0', fontSize: '13px' }}>
+                    <p className="whitespace-pre-wrap" style={{ color: 'var(--msg-assistant-text)', fontSize: '13px' }}>
                       {streamText}<span className="animate-pulse">▋</span>
                     </p>
                   </div>

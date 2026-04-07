@@ -53,6 +53,32 @@ async def list_crons():
     return {"jobs": jobs, "updated_at": data.get("updated_at")}
 
 
+@router.get("/{job_id}")
+async def get_cron(job_id: str):
+    """Get full cron job details including prompt."""
+    cron_data = _load_jobs()
+    for j in cron_data.get("jobs", []):
+        if j["id"] == job_id:
+            return {
+                "id": j["id"],
+                "name": j["name"],
+                "schedule": j.get("schedule", {}).get("display") if isinstance(j.get("schedule"), dict) else j.get("schedule_display"),
+                "repeat": j.get("repeat"),
+                "enabled": j.get("enabled", True),
+                "state": j.get("state", "unknown"),
+                "next_run_at": j.get("next_run_at"),
+                "last_run_at": j.get("last_run_at"),
+                "last_status": j.get("last_status"),
+                "last_error": j.get("last_error"),
+                "deliver": j.get("deliver"),
+                "model": j.get("model"),
+                "provider": j.get("provider"),
+                "prompt": j.get("prompt", ""),
+                "script": j.get("script"),
+            }
+    raise HTTPException(404, "Cron job not found")
+
+
 @router.put("/{job_id}")
 async def update_cron(job_id: str, data: UpdateCronJob):
     """Update a cron job (name, schedule, enabled, deliver)."""

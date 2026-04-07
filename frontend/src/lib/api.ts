@@ -35,6 +35,7 @@ export const memoryApi = {
 // ── Crons ────────────────────────────────────────────────────────────────────
 export const cronsApi = {
   list: () => api.get<{ jobs: CronJob[]; updated_at: string }>('/crons').then(r => r.data),
+  get: (jobId: string) => api.get<CronJobDetail>(`/crons/${jobId}`).then(r => r.data),
   update: (jobId: string, data: { name?: string; schedule?: string; enabled?: boolean; deliver?: string }) =>
     api.put(`/crons/${jobId}`, data).then(r => r.data),
   runNow: (jobId: string) => api.post(`/crons/${jobId}/run`).then(r => r.data),
@@ -125,7 +126,7 @@ export interface SkillDetail extends Skill {
   readme: string
 }
 
-export interface CronJob {
+export interface CronJob extends CronJobDetail {
   id: string
   name: string
   schedule: string
@@ -139,6 +140,24 @@ export interface CronJob {
   deliver: string | null
   model: string | null
   provider: string | null
+}
+
+export interface CronJobDetail {
+  id: string
+  name: string
+  schedule: string
+  repeat: number | null
+  enabled: boolean
+  state: string
+  next_run_at: string | null
+  last_run_at: string | null
+  last_status: string | null
+  last_error: string | null
+  deliver: string | null
+  model: string | null
+  provider: string | null
+  prompt: string
+  script?: string
 }
 
 export interface Plugin {

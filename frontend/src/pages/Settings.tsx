@@ -49,10 +49,6 @@ export default function Settings() {
 
   const cfg = sysConfig || {}
   const currentModel = (cfg.model as any) || {}
-  const customProviders: any[] = cfg.custom_providers || []
-  const dynamicOptions = customProviders.map((p: any) => p.model).filter(Boolean)
-  const uniqueOptions = [...new Set(dynamicOptions)]
-  const hasOptions = uniqueOptions.length > 0
 
   // Filter exit_reason that mentions telegram
   const exitReason = gateway?.state?.exit_reason
@@ -141,44 +137,19 @@ export default function Settings() {
             <Cpu size={16} style={{ color: '#05d9e8' }} />
             <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#05d9e8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Model</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div>
-              <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: '4px' }}>ACTIVE MODEL</label>
-              {hasOptions ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxWidth: '500px' }}>
-                  <div>
-                    <label style={{ fontSize: '0.65rem', color: 'var(--muted)', display: 'block', marginBottom: '2px' }}>PROVIDER</label>
-                    <select className="select" style={{ width: '100%' }}>
-                      {[...new Map(customProviders.map((p: any) => [p.name, p])).values()].map((p: any) => (
-                        <option key={p.name} value={p.name}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.65rem', color: 'var(--muted)', display: 'block', marginBottom: '2px' }}>MODEL</label>
-                    <select className="select" value={currentModel.default || ''} style={{ width: '100%' }}>
-                      {uniqueOptions.map(m => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              ) : (
-                <div className="input" style={{ width: '100%', maxWidth: '500px', display: 'flex', alignItems: 'center' }}>
-                  <span style={{ color: '#00ff41', fontFamily: 'JetBrains Mono, monospace', fontSize: '0.875rem' }}>
-                    {currentModel.default || 'not set'}
-                  </span>
-                </div>
-              )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Model:</span>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.875rem', color: '#00ff41' }}>{currentModel.default || '—'}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Provider:</span>
-              <span className="font-mono" style={{ color: '#05d9e8', fontSize: '0.75rem' }}>{currentModel.provider || '—'}</span>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.875rem', color: '#05d9e8' }}>{currentModel.provider || '—'}</span>
             </div>
             {currentModel.base_url && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Endpoint:</span>
-                <span className="font-mono" style={{ color: 'var(--muted)', fontSize: '0.7rem' }}>{currentModel.base_url}</span>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.75rem', color: 'var(--muted)' }}>{currentModel.base_url}</span>
               </div>
             )}
           </div>
