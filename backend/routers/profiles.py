@@ -39,6 +39,37 @@ def _get_active_profile_name() -> str | None:
     return None
 
 
+# Sensitive keys that must never be sent to the frontend
+_SENSITIVE_KEYS = frozenset({
+    "api_key", "api-key", "api_secret", "api-secret",
+    "token", "access_token", "access-token",
+    "refresh_token", "refresh-token",
+    "secret", "secret_key", "secret-key",
+    "password", "passphrase",
+    "private_key", "private-key",
+    "auth", "authorization",
+})
+
+
+def _sanitize_config(cfg: dict) -> dict:
+    """Remove sensitive keys from a config dict before sending to the frontend."""
+    result = {}
+    for k, v in cfg.items():
+        k_lower = k.lower().replace("-", "_").replace(" ", "_")
+        if k_lower in _SENSITIVE_KEYS or k_lower.endswith("_token") or k_lower.endswith("_key") or k_lower.endswith("_secret"):
+            result[k] = "[REDACTED]"
+        elif isinstance(v, dict):
+            result[k] = _sanitize_config(v)
+        elif isinstance(v, list):
+            result[k] = [
+                _sanitize_config(item) if isinstance(item, dict) else item
+                for item in v
+            ]
+        else:
+            result[k] = v
+    return result
+
+
 def _read_config_model(profile_dir: Path) -> tuple[str | None, str | None]:
     """Read model and provider from a config.yaml file."""
     cfg_path = profile_dir / "config.yaml"
@@ -111,6 +142,7 @@ async def get_profile(name: str):
             cfg = yaml.safe_load(config_file.read_text()) or {}
         except Exception:
             pass
+    cfg = _sanitize_config(cfg)
     return {"name": name, "path": str(profile_dir), "config": cfg}
 
 

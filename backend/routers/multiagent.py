@@ -9,6 +9,36 @@ from fastapi import APIRouter, HTTPException
 router = APIRouter()
 CONFIG_FILE = Path.home() / ".hermes" / "multi-agent" / "config.yaml"
 
+# Sensitive keys that must never be sent to the frontend
+_SENSITIVE_KEYS = frozenset({
+    "api_key", "api-key", "api_secret", "api-secret",
+    "token", "access_token", "access-token",
+    "refresh_token", "refresh-token",
+    "secret", "secret_key", "secret-key",
+    "password", "passphrase",
+    "private_key", "private-key",
+    "auth", "authorization",
+})
+
+
+def _sanitize_config(cfg: dict) -> dict:
+    """Remove sensitive keys from a config dict before sending to the frontend."""
+    result = {}
+    for k, v in cfg.items():
+        k_lower = k.lower().replace("-", "_").replace(" ", "_")
+        if k_lower in _SENSITIVE_KEYS or k_lower.endswith("_token") or k_lower.endswith("_key") or k_lower.endswith("_secret"):
+            result[k] = "[REDACTED]"
+        elif isinstance(v, dict):
+            result[k] = _sanitize_config(v)
+        elif isinstance(v, list):
+            result[k] = [
+                _sanitize_config(item) if isinstance(item, dict) else item
+                for item in v
+            ]
+        else:
+            result[k] = v
+    return result
+
 
 @router.get("/", response_model=dict)
 async def get_multiagent_overview():
@@ -36,7 +66,7 @@ async def get_multiagent_overview():
             "description": info.get("description"),
             "status": "unknown",
         })
-    return {"config": cfg, "agents": agent_list, "state": cfg.get("state", "unknown")}
+    return {"config": _sanitize_config(cfg), "agents": agent_list, "state": cfg.get("state", "unknown")}
 
 
 @router.get("/config")
@@ -45,7 +75,7 @@ async def get_multiagent_config():
     if not CONFIG_FILE.exists():
         raise HTTPException(404, "Multi-agent config not found")
     cfg = yaml.safe_load(CONFIG_FILE.read_text()) or {}
-    return {"config": cfg, "file": str(CONFIG_FILE)}
+    return {"config": _sanitize_config(cfg), "file": str(CONFIG_FILE)}
 
 
 def _get_channel_name(channel_val: str, channels: dict) -> str:
