@@ -107,8 +107,9 @@ export const systemApi = {
   info: () => api.get<SystemInfo>('/system').then(r => r.data),
   config: () => api.get<Record<string, unknown>>('/system/config').then(r => r.data),
   gatewayStatus: () => api.get<GatewayStatus>('/system/gateway').then(r => r.data),
-  gatewayRestart: () => api.post<{ ok: boolean; message: string; new_pid?: number }>('/system/gateway/restart').then(r => r.data),
   networkInfo: () => api.get<NetworkInfo>('/system/network').then(r => r.data),
+  usage: () => api.get<UsageStats>('/system/usage').then(r => r.data),
+  gatewayRestart: () => api.post('/system/gateway/restart').then(r => r.data),
 }
 
 export interface NetworkInfo {
@@ -259,4 +260,27 @@ export interface SystemInfo {
   session_count: number
   skill_count: number
   uptime: string
+}
+
+export interface UsageStats {
+  totals: {
+    sessions: number
+    input_tokens: number
+    output_tokens: number
+    cache_read_tokens: number
+    cache_write_tokens: number
+    reasoning_tokens: number
+    estimated_cost_usd: number
+    actual_cost_usd: number
+  }
+  recent: {
+    id: string
+    source: string
+    model: string
+    input_tokens: number
+    output_tokens: number
+    estimated_cost_usd: number
+    billing_provider: string | null
+  }[]
+  error?: string
 }

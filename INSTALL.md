@@ -69,19 +69,9 @@ The Dashboard shows active network addresses in the **NETWORK ACCESS** card.
 
 ## 4. Configuration
 
-### Environment Variables
+**No configuration needed** — CyberUI automatically reads all settings from your Hermes installation (`~/.hermes/`). API keys, tokens, provider endpoints, and model configuration are picked up from Hermes' existing config files and environment.
 
-Create a `.env` file in `backend/`:
-
-```
-HERMES_CONFIG_PATH=~/.hermes
-PORT=23689
-CORS_ORIGINS=*
-```
-
-### Model Configuration
-
-Models and providers are configured in your Hermes config file (`config.yaml` or `config.json`). The Settings page displays the active model, provider, and endpoint from `GET /api/system/config`.
+The Settings page in the UI shows the active model, provider, and endpoint detected from `~/.hermes/config.yaml`. You do not need to create a `.env` file or set any environment variables manually.
 
 ---
 

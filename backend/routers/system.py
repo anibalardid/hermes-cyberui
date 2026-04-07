@@ -1,5 +1,5 @@
 """
-System router — stats, config, version info, gateway management.
+System router — stats, config, version info, gateway management, usage stats.
 """
 import json
 import os
@@ -7,6 +7,7 @@ import signal
 import psutil
 import platform
 import subprocess
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 
@@ -278,3 +279,71 @@ async def gateway_restart():
         return {"ok": True, "message": "Gateway restarted (PID changed)", "new_pid": new_pid}
 
     return {"ok": False, "message": "Gateway restart may have failed - check manually"}
+
+
+@router.get("/usage")
+async def get_usage():
+    """Token usage and cost stats from Hermes state.db."""
+    db_path = HERMES_HOME / "state.db"
+    if not db_path.exists():
+        return {"error": "state.db not found"}
+
+    try:
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+
+        c.execute("""
+            SELECT
+                COUNT(*) as total_sessions,
+                SUM(input_tokens) as total_in,
+                SUM(output_tokens) as total_out,
+                SUM(cache_read_tokens) as total_cache_read,
+                SUM(cache_write_tokens) as total_cache_write,
+                SUM(reasoning_tokens) as total_reasoning,
+                SUM(estimated_cost_usd) as total_est_cost,
+                SUM(actual_cost_usd) as total_actual_cost
+            FROM sessions
+        """)
+        row = c.fetchone()
+
+        c.execute("""
+            SELECT id, source, model, input_tokens, output_tokens,
+                   estimated_cost_usd, cost_status, billing_provider, ended_at
+            FROM sessions
+            WHERE source != 'cron'
+            ORDER BY ended_at DESC
+            LIMIT 6
+        """)
+        recent_rows = c.fetchall()
+        conn.close()
+
+        def fmt(n):
+            return n if n is not None else 0
+
+        return {
+            "totals": {
+                "sessions": fmt(row["total_sessions"]),
+                "input_tokens": fmt(row["total_in"]),
+                "output_tokens": fmt(row["total_out"]),
+                "cache_read_tokens": fmt(row["total_cache_read"]),
+                "cache_write_tokens": fmt(row["total_cache_write"]),
+                "reasoning_tokens": fmt(row["total_reasoning"]),
+                "estimated_cost_usd": round(fmt(row["total_est_cost"]), 6),
+                "actual_cost_usd": round(fmt(row["total_actual_cost"]), 6),
+            },
+            "recent": [
+                {
+                    "id": r["id"],
+                    "source": r["source"],
+                    "model": r["model"],
+                    "input_tokens": r["input_tokens"] or 0,
+                    "output_tokens": r["output_tokens"] or 0,
+                    "estimated_cost_usd": round(r["estimated_cost_usd"] or 0, 6),
+                    "billing_provider": r["billing_provider"],
+                }
+                for r in recent_rows
+            ],
+        }
+    except Exception as e:
+        return {"error": str(e)}

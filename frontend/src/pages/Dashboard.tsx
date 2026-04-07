@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { systemApi, sessionsApi, skillsApi } from '../lib/api'
-import { Cpu, HardDrive, MemoryStick, MessageSquare, Brain, Zap, Globe, Link2 } from 'lucide-react'
+import { Cpu, HardDrive, MemoryStick, MessageSquare, Brain, Zap, Globe, Link2, Coins } from 'lucide-react'
 
 function StatCard({ icon, label, value, sub, valueColor }: {
   icon: React.ReactNode
@@ -56,6 +56,7 @@ export default function Dashboard() {
   const { data: sessions } = useQuery({ queryKey: ['sessions'], queryFn: sessionsApi.list })
   const { data: skills } = useQuery({ queryKey: ['skills'], queryFn: skillsApi.list })
   const { data: network } = useQuery({ queryKey: ['network'], queryFn: systemApi.networkInfo })
+  const { data: usage } = useQuery({ queryKey: ['usage'], queryFn: systemApi.usage })
 
   // Parse hostname cleanly (drop domain part)
   const hostname = sys?.hostname?.split('.')[0] ?? '—'
@@ -114,6 +115,57 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Token usage card */}
+      {usage && !usage.error && (
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <h2 className="section-title" style={{ marginBottom: '1rem' }}>
+            <Coins size={12} style={{ display: 'inline', marginRight: '6px', color: '#f5d400' }} />
+            TOKEN USAGE
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+            <div style={{ textAlign: 'center', padding: '0.75rem', background: 'rgba(0,255,65,0.04)', borderRadius: '0.5rem', border: '1px solid rgba(0,255,65,0.1)' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#00ff41', fontFamily: 'Orbitron, sans-serif' }}>
+                {(usage.totals.input_tokens / 1_000_000).toFixed(2)}M
+              </div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '2px' }}>Input Tokens</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: '0.75rem', background: 'rgba(5,217,232,0.04)', borderRadius: '0.5rem', border: '1px solid rgba(5,217,232,0.1)' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#05d9e8', fontFamily: 'Orbitron, sans-serif' }}>
+                {(usage.totals.output_tokens / 1_000_000).toFixed(3)}M
+              </div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '2px' }}>Output Tokens</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: '0.75rem', background: 'rgba(245,212,0,0.04)', borderRadius: '0.5rem', border: '1px solid rgba(245,212,0,0.1)' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f5d400', fontFamily: 'Orbitron, sans-serif' }}>
+                {usage.totals.reasoning_tokens > 0 ? `${(usage.totals.reasoning_tokens / 1_000_000).toFixed(2)}M` : '—'}
+              </div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '2px' }}>Reasoning</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: '0.75rem', background: 'rgba(212,0,255,0.04)', borderRadius: '0.5rem', border: '1px solid rgba(212,0,255,0.1)' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#d400ff', fontFamily: 'Orbitron, sans-serif' }}>
+                ${usage.totals.estimated_cost_usd.toFixed(4)}
+              </div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '2px' }}>Est. Cost USD</div>
+            </div>
+          </div>
+          {usage.recent.length > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>Recent Sessions</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                {usage.recent.slice(0, 4).map(r => (
+                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.25rem 0' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--muted)', minWidth: '60px' }}>{r.source}</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--txt)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.model}</span>
+                    <span style={{ fontSize: '0.7rem', color: '#05d9e8' }}>{(r.input_tokens / 1000).toFixed(1)}K in</span>
+                    <span style={{ fontSize: '0.7rem', color: '#00ff41' }}>{(r.output_tokens / 1000).toFixed(1)}K out</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

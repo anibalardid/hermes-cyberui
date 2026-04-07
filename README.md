@@ -55,6 +55,8 @@ Backend runs on port **23689**. The frontend is built into `dist/` and served by
 
 ## Quick Start
 
+**No configuration needed** — CyberUI reads everything from your existing Hermes installation (`~/.hermes/`). API keys, tokens, and provider settings are picked up automatically from Hermes' config.
+
 ```bash
 cd backend
 pip install -r requirements.txt
