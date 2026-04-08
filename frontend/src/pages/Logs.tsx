@@ -211,7 +211,7 @@ export default function Logs() {
       </div>
 
       {/* Log viewer */}
-      <div style={{ flex: 1, overflow: 'hidden', borderRadius: '0.5rem', border: '1px solid var(--border)', background: '#050505' }}>
+      <div style={{ maxHeight: 'calc(100vh - 19rem)', overflow: 'hidden', borderRadius: '0.5rem', border: '1px solid var(--border)', background: '#050505', flexShrink: 0 }}>
         <div
           ref={scrollRef}
           style={{ height: '100%', overflowY: 'auto', padding: '0.75rem' }}
@@ -230,21 +230,35 @@ export default function Logs() {
 
       {/* Pagination */}
       {data && data.total_lines > LIMIT && (
-        <div className="flex justify-center gap-4 items-center">
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', flexWrap: 'wrap' }}>
           <button
             disabled={offset === 0}
             onClick={() => { setOffset(Math.max(0, offset - LIMIT)); setViewAnchor('start') }}
-            className="btn btn-sm btn-ghost"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.35rem',
+              padding: '0.375rem 0.75rem', borderRadius: '0.375rem',
+              fontSize: '0.8rem', background: 'transparent',
+              border: '1px solid var(--border)', cursor: 'pointer',
+              color: offset === 0 ? 'var(--muted)' : 'var(--txt)',
+              opacity: offset === 0 ? 0.5 : 1,
+            }}
           >
             Prev
           </button>
-          <span className="text-sm font-mono text-muted">
+          <span style={{ fontSize: '0.8rem', fontFamily: 'monospace', color: 'var(--muted)', minWidth: '80px', textAlign: 'center' }}>
             {offset + 1}–{showingEnd} / {data.total_lines.toLocaleString()}
           </span>
           <button
             disabled={offset + LIMIT >= data.total_lines}
             onClick={() => { setOffset(offset + LIMIT); setViewAnchor('start') }}
-            className="btn btn-sm btn-ghost"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.35rem',
+              padding: '0.375rem 0.75rem', borderRadius: '0.375rem',
+              fontSize: '0.8rem', background: 'transparent',
+              border: '1px solid var(--border)', cursor: 'pointer',
+              color: offset + LIMIT >= data.total_lines ? 'var(--muted)' : 'var(--txt)',
+              opacity: offset + LIMIT >= data.total_lines ? 0.5 : 1,
+            }}
           >
             Next
           </button>

@@ -5,7 +5,7 @@
 /* ── Reset & Root ─────────────────────── */
 *,*::before,*::after{box-sizing:border-box}
 html{height:100%}
-body{height:100%;margin:0;padding:0;overflow:hidden;font-family:'JetBrains Mono','Share Tech Mono','Courier New',monospace;-webkit-font-smoothing:antialiased;background:var(--bg);color:var(--txt)}
+body{height:100%;margin:0;padding:0;overflow:hidden;font-family:'JetBrains Mono','Share Tech Mono','Courier New',monospace;-webkit-font-smoothing:antialiased;background:var(--bg);color:var(--txt);word-break:break-word;overflow-wrap:break-word}
 #root{height:100%;display:flex;flex-direction:column}
 
 /* ── Themes ─────────────────────────────── */
@@ -59,7 +59,7 @@ body{height:100%;margin:0;padding:0;overflow:hidden;font-family:'JetBrains Mono'
 .title-bar{width:4px;height:2rem;background:var(--primary);border-radius:2px;box-shadow:0 0 12px rgba(0,255,65,0.6)}
 
 /* ── Cards ─────────────────────────────── */
-.card{background:var(--surf);border:1px solid var(--border);border-radius:0.5rem;padding:1rem;transition:all 0.15s}
+.card{background:var(--surf);border:1px solid var(--border);border-radius:0.5rem;padding:1rem;transition:all 0.15s;overflow:hidden} /* overflow:hidden prevents child content from pushing the card */
 .card:hover{border-color:var(--primary);box-shadow:0 0 12px rgba(0,255,65,0.15)}
 .card-pink{background:var(--surf);border:1px solid rgba(212,0,255,0.3);border-radius:0.5rem;padding:1rem}
 .card-pink:hover{border-color:var(--pink);box-shadow:0 0 12px rgba(212,0,255,0.15)}
@@ -103,10 +103,14 @@ body{height:100%;margin:0;padding:0;overflow:hidden;font-family:'JetBrains Mono'
 .badge-amber{background:rgba(245,212,0,0.1);color:var(--amber);border:1px solid rgba(245,212,0,0.3)}
 
 /* ── Tables ────────────────────────────── */
-.table{width:100%;border-collapse:collapse;font-size:0.875rem}
-.table th{text-align:left;padding:0.5rem 0.75rem;border-bottom:1px solid var(--border);color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.05em}
-.table td{padding:0.5rem 0.75rem;border-bottom:1px solid rgba(26,26,46,0.5);color:var(--txt)}
+.table{width:100%;border-collapse:collapse;font-size:0.875rem;table-layout:fixed}
+.table th{text-align:left;padding:0.5rem 0.75rem;border-bottom:1px solid var(--border);color:var(--muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.table td{padding:0.5rem 0.75rem;border-bottom:1px solid rgba(26,26,46,0.5);color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;word-break:break-word}
 .table tr:hover td{background:rgba(255,255,255,0.02)}
+
+/* Table columns: title always gets priority space */
+.table .col-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0} /* grows to fill */
+.table .col-narrow{width:80px;white-space:nowrap}
 
 /* ── Section Title ────────────────────── */
 .section-title{font-size:0.7rem;font-weight:600;color:var(--cyan);text-transform:uppercase;letter-spacing:0.1em}

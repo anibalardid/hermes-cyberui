@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sessionsApi } from '../lib/api'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { ArrowLeft, Send, Info, PanelRightClose, PanelRightOpen, Bot, User } from 'lucide-react'
 
 const SIDEBAR_STORAGE_KEY = 'hermes-chat-sidebar-width'
@@ -21,6 +22,7 @@ export default function Chat() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarWidth, setSidebarWidth] = useState(getStoredWidth)
   const [isResizing, setIsResizing] = useState(false)
+  const isMobile = useIsMobile()
   const abortRef = useRef<AbortController | null>(null)
   const resizeStartX = useRef(0)
   const resizeStartWidth = useRef(0)
@@ -151,7 +153,7 @@ export default function Chat() {
   const recentMessages = messages.slice(-20)
 
   return (
-    <div className="flex h-full" style={{ background: 'var(--cyber-bg, #0a0a0f)' }}>
+    <div className="flex h-full" style={{ background: 'var(--bg)' }}>
       {/* Main chat area */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Header */}
@@ -159,24 +161,24 @@ export default function Chat() {
           className="flex items-center gap-3 px-4 py-3 border-b"
           style={{ background: 'var(--surf)', borderColor: 'var(--border)' }}
         >
-          <Link to="/sessions" className="p-1.5 rounded hover:bg-white/5 transition-colors" style={{ color: 'var(--cyber-text)' }}>
+          <Link to="/sessions" className="p-1.5 rounded hover:bg-white/5 transition-colors" style={{ color: 'var(--txt)' }}>
             <ArrowLeft size={16} />
           </Link>
           <div className="flex-1 min-w-0">
-            <p className="font-medium truncate" style={{ color: 'var(--cyber-text)', fontSize: '13px' }}>
+            <p className="font-medium truncate" style={{ color: 'var(--txt)', fontSize: '13px' }}>
               {messages[0]?.content?.slice(0, 60) || 'New Session'}
             </p>
-            <p className="text-xs" style={{ color: 'var(--cyber-muted)' }}>
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>
               {messages.length} messages
               {streaming && (
-                <span className="ml-2" style={{ color: 'var(--cyber-primary)' }}>● streaming</span>
+                <span className="ml-2" style={{ color: 'var(--primary)' }}>● streaming</span>
               )}
             </p>
           </div>
           <button
             onClick={() => setSidebarOpen(o => !o)}
             className="p-1.5 rounded hover:bg-white/5 transition-colors"
-            style={{ color: sidebarOpen ? 'var(--cyber-primary)' : 'var(--cyber-muted)' }}
+            style={{ color: sidebarOpen ? 'var(--primary)' : 'var(--muted)' }}
             title={sidebarOpen ? 'Hide activity' : 'Show activity'}
           >
             {sidebarOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
@@ -188,7 +190,7 @@ export default function Chat() {
           {isLoading ? (
             <div className="space-y-3">
               {[1, 2].map((i) => (
-                <div key={i} className="h-16 rounded-lg animate-pulse" style={{ background: 'var(--cyber-surface)' }} />
+                <div key={i} className="h-16 rounded-lg animate-pulse" style={{ background: 'var(--surf)' }} />
               ))}
             </div>
           ) : messages.length === 0 ? (
@@ -197,12 +199,12 @@ export default function Chat() {
                 className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
                 style={{ background: 'rgba(0,255,65,0.05)', border: '1px solid rgba(0,255,65,0.15)' }}
               >
-                <Info size={24} style={{ color: 'var(--cyber-primary)' }} />
+                <Info size={24} style={{ color: 'var(--primary)' }} />
               </div>
-              <p className="font-bold text-sm tracking-widest" style={{ fontFamily: 'Orbitron, sans-serif', color: 'var(--cyber-primary)' }}>
+              <p className="font-bold text-sm tracking-widest" style={{ fontFamily: 'Orbitron, sans-serif', color: 'var(--primary)' }}>
                 READY TO SERVE
               </p>
-              <p className="text-xs mt-2" style={{ color: 'var(--cyber-muted)' }}>
+              <p className="text-xs mt-2" style={{ color: 'var(--muted)' }}>
                 Type a message below to start the session.
               </p>
             </div>
@@ -249,7 +251,7 @@ export default function Chat() {
               {error && (
                 <div
                   className="rounded px-3 py-2 text-sm"
-                  style={{ background: 'rgba(255,42,109,0.08)', border: '1px solid rgba(255,42,109,0.3)', color: 'var(--cyber-pink)' }}
+                  style={{ background: 'rgba(255,42,109,0.08)', border: '1px solid rgba(255,42,109,0.3)', color: 'var(--pink)' }}
                 >
                   Error: {error}
                 </div>
@@ -266,7 +268,7 @@ export default function Chat() {
         >
           <div className="flex gap-2">
             <div className="flex-1 relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm" style={{ color: 'var(--cyber-primary)' }}>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm" style={{ color: 'var(--primary)' }}>
                 &gt;_
               </span>
               <textarea
@@ -290,7 +292,7 @@ export default function Chat() {
             {streaming ? (
               <button
                 className="px-3 rounded font-mono text-sm border transition-colors"
-                style={{ borderColor: 'var(--cyber-pink)', color: 'var(--cyber-pink)' }}
+                style={{ borderColor: 'var(--pink)', color: 'var(--pink)' }}
                 onClick={handleStop}
               >
                 STOP
@@ -298,7 +300,7 @@ export default function Chat() {
             ) : (
               <button
                 className="px-3 rounded transition-colors"
-                style={{ background: 'var(--cyber-primary)', color: '#000' }}
+                style={{ background: 'var(--primary)', color: '#000' }}
                 onClick={handleSend}
                 disabled={!input.trim()}
               >
@@ -315,8 +317,8 @@ export default function Chat() {
           className="shrink-0 flex flex-col border-l relative"
           style={{
             width: sidebarWidth,
-            background: 'var(--cyber-surface, #12121f)',
-            borderColor: 'var(--cyber-border, #1a1a2e)',
+            background: 'var(--surf)',
+            borderColor: 'var(--border)',
             cursor: isResizing ? 'ew-resize' : undefined,
           }}
         >
@@ -326,7 +328,7 @@ export default function Chat() {
             className="absolute left-0 top-0 bottom-0 w-1 hover:w-1.5 transition-all"
             style={{
               cursor: 'ew-resize',
-              background: isResizing ? 'var(--cyber-primary)' : 'transparent',
+              background: isResizing ? 'var(--primary)' : 'transparent',
               zIndex: 10,
             }}
             title="Drag to resize"
@@ -335,45 +337,45 @@ export default function Chat() {
           {/* Sidebar header */}
           <div
             className="flex items-center justify-between px-3 py-2.5 border-b"
-            style={{ borderColor: 'var(--cyber-border, #1a1a2e)' }}
+            style={{ borderColor: 'var(--border)' }}
           >
-            <span className="text-xs font-bold uppercase tracking-widest" style={{ fontFamily: 'Orbitron, sans-serif', color: 'var(--cyber-accent)' }}>
+            <span className="text-xs font-bold uppercase tracking-widest" style={{ fontFamily: 'Orbitron, sans-serif', color: 'var(--accent)' }}>
               Activity
             </span>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="p-1 rounded hover:bg-white/5"
-              style={{ color: 'var(--cyber-muted)' }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: isMobile ? '0.5rem' : '0.25rem', display: 'flex', alignItems: 'center', fontSize: isMobile ? '1.25rem' : '0.875rem' }}
+              aria-label="Close activity sidebar"
             >
-              <PanelRightClose size={14} />
+              <PanelRightClose size={isMobile ? 18 : 14} />
             </button>
           </div>
 
           {/* Activity feed */}
-          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+          <div className="flex-1 overflow-y-auto p-2 space-y-1.5" style={{ minHeight: 0 }}>
             {recentMessages.map((msg, i) => (
               <div
                 key={i}
                 className="p-2 rounded text-xs"
-                style={{ background: 'var(--cyber-bg)', border: '1px solid var(--cyber-border)' }}
+                style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
               >
                 <div className="flex items-center gap-1.5 mb-1">
                   {msg.role === 'user' ? (
-                    <User size={10} style={{ color: 'var(--cyber-accent)' }} />
+                    <User size={10} style={{ color: 'var(--accent)' }} />
                   ) : (
-                    <Bot size={10} style={{ color: 'var(--cyber-primary)' }} />
+                    <Bot size={10} style={{ color: 'var(--primary)' }} />
                   )}
                   <span
                     className="font-bold uppercase tracking-wider"
-                    style={{ color: msg.role === 'user' ? 'var(--cyber-accent)' : 'var(--cyber-primary)', fontSize: '10px' }}
+                    style={{ color: msg.role === 'user' ? 'var(--accent)' : 'var(--primary)', fontSize: '10px' }}
                   >
                     {msg.role}
                   </span>
-                  <span className="ml-auto" style={{ color: 'var(--cyber-muted)', fontSize: '9px' }}>
+                  <span className="ml-auto" style={{ color: 'var(--muted)', fontSize: '9px' }}>
                     {new Date((msg as any).timestamp || Date.now()).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <p className="line-clamp-3 leading-relaxed" style={{ color: 'var(--cyber-text)' }}>
+                <p className="line-clamp-3 leading-relaxed" style={{ color: 'var(--txt)' }}>
                   {msg.content}
                 </p>
               </div>

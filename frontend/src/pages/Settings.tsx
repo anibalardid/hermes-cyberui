@@ -188,7 +188,7 @@ export default function Settings() {
             <Monitor size={16} style={{ color: '#05d9e8' }} />
             <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#05d9e8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Color Theme</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(8rem, 1fr))', gap: '0.75rem' }}>
             {THEMES.map(t => {
               const isActive = theme === t.id
               return (
