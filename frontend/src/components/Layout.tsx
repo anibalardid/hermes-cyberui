@@ -4,7 +4,7 @@ import { useAppStore } from '../stores/appStore'
 import {
   LayoutDashboard, MessageSquare, Brain, Database,
   Settings, ChevronLeft, ChevronRight, Terminal,
-  Clock, Puzzle, FileText, UserCircle, Bot, Eye, FolderOpen, Menu, X
+  Clock, Puzzle, FileText, UserCircle, Bot, Eye, FolderOpen, Menu, X, Activity, UserCheck
 } from 'lucide-react'
 
 const NAV = [
@@ -13,11 +13,13 @@ const NAV = [
   { to: '/skills', icon: Brain, label: 'Skills' },
   { to: '/memory', icon: Database, label: 'Memory' },
   { to: '/crons', icon: Clock, label: 'Crons' },
+  { to: '/jobs', icon: Activity, label: 'Jobs' },
   { to: '/plugins', icon: Puzzle, label: 'Plugins' },
   { to: '/files', icon: FolderOpen, label: 'Files' },
   { to: '/logs', icon: FileText, label: 'Logs' },
   { to: '/profiles', icon: UserCircle, label: 'Profiles' },
   { to: '/multiagent', icon: Bot, label: 'Multi-Agent' },
+  { to: '/config', icon: UserCheck, label: 'Config' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 

@@ -12,6 +12,8 @@ import Profiles from './pages/Profiles'
 import Multiagent from './pages/Multiagent'
 import Settings from './pages/Settings'
 import Files from './pages/Files'
+import Jobs from './pages/Jobs'
+import Config from './pages/Config'
 
 export default function App() {
   return (
@@ -29,6 +31,8 @@ export default function App() {
         <Route path="/multiagent" element={<Multiagent />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/files" element={<Files />} />
+        <Route path="/jobs" element={<Jobs />} />
+        <Route path="/config" element={<Config />} />
       </Route>
     </Routes>
   )

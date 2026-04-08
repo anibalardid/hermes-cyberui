@@ -284,3 +284,75 @@ export interface UsageStats {
   }[]
   error?: string
 }
+
+// ── Jobs Feed ──────────────────────────────────────────────────────────────
+export interface JobsFeed {
+  hermes: { status: string | null; platform: string | null }
+  summary: {
+    total_jobs: number
+    scheduled: number
+    paused: number
+    errors: number
+    active_sessions: number
+    recent_sessions: number
+  }
+  jobs: {
+    scheduled: JobInfo[]
+    paused: JobInfo[]
+    errors: JobInfo[]
+  }
+  sessions: {
+    active: SessionInfo[]
+    recent: SessionInfo[]
+  }
+  updated_at: string
+}
+
+export interface JobInfo {
+  id: string
+  name: string
+  schedule: string
+  state: string
+  enabled: boolean
+  next_run_at: string | null
+  last_run_at: string | null
+  last_status: string | null
+  last_error: string | null
+  deliver: string | null
+  model: string | null
+  provider: string | null
+  repeat_completed: number | null
+  repeat_times: number | null
+}
+
+export interface SessionInfo {
+  id: string
+  source: string
+  model: string
+  title: string
+  started_at: string
+  ended_at: string | null
+  message_count: number
+  tool_call_count: number
+  input_tokens: number
+  output_tokens: number
+  estimated_cost_usd: number
+  duration_seconds: number
+  active: boolean
+}
+
+export const jobsApi = {
+  feed: () => api.get<JobsFeed>('/jobs').then(r => r.data),
+  history: (jobId: string) => api.get<{ job: JobInfo }>(`/jobs/${jobId}/history`).then(r => r.data),
+}
+
+// ── Config ─────────────────────────────────────────────────────────────────
+export const configApi = {
+  get: () => api.get<ConfigData>('/config').then(r => r.data),
+}
+
+export interface ConfigData {
+  sections: Record<string, Record<string, unknown>>
+  configVersion: number | null
+  full: Record<string, unknown>
+}

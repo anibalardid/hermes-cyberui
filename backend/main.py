@@ -27,6 +27,8 @@ from routers.profiles import router as profiles_router
 from routers.multiagent import router as multiagent_router
 from routers.system import router as system_router
 from routers.files import router as files_router
+from routers.jobs import router as jobs_router
+from routers.config import router as config_router
 
 
 @asynccontextmanager
@@ -68,6 +70,8 @@ app.include_router(profiles_router, prefix="/api/profiles", tags=["profiles"])
 app.include_router(multiagent_router, prefix="/api/multiagent", tags=["multiagent"])
 app.include_router(system_router, prefix="/api/system", tags=["system"])
 app.include_router(files_router, prefix="/api/files", tags=["files"])
+app.include_router(jobs_router, prefix="/api/jobs", tags=["jobs"])
+app.include_router(config_router, prefix="/api/config", tags=["config"])
 
 # Health check
 @app.get("/health")
