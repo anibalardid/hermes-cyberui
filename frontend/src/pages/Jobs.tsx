@@ -99,7 +99,7 @@ function SessionCard({ session }: { session: SessionInfo }) {
           </div>
           {session.ended_at && (
             <p className="text-[10px] mt-2" style={{ color: 'var(--muted)' }}>
-              Finalizado: {new Date(session.ended_at).toLocaleString('es-AR')}
+              Ended: {new Date(session.ended_at).toLocaleString('es-AR')}
             </p>
           )}
         </div>
@@ -225,25 +225,25 @@ function SummaryCards({ data }: { data: JobsFeed }) {
           <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Crons</span>
         </div>
         <p className="text-2xl font-bold" style={{ fontFamily: 'Orbitron, sans-serif', color: 'var(--txt)' }}>{summary.total_jobs}</p>
-        <p className="text-[9px] mt-1" style={{ color: 'var(--muted)' }}>{summary.scheduled} activos · {summary.paused} pausados</p>
+        <p className="text-[9px] mt-1" style={{ color: 'var(--muted)' }}>{summary.scheduled} active · {summary.paused} paused</p>
       </div>
 
       <div className="rounded border p-4" style={{ background: 'var(--surf)', borderColor: 'var(--border)' }}>
         <div className="flex items-center gap-2 mb-2">
           <Activity size={13} style={{ color: 'var(--primary)' }} />
-          <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Sesiones</span>
+          <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Sessions</span>
         </div>
         <p className="text-2xl font-bold" style={{ fontFamily: 'Orbitron, sans-serif', color: 'var(--txt)' }}>{summary.active_sessions}</p>
-        <p className="text-[9px] mt-1" style={{ color: 'var(--muted)' }}>+ {summary.recent_sessions} recientes</p>
+        <p className="text-[9px] mt-1" style={{ color: 'var(--muted)' }}>+ {summary.recent_sessions} recent</p>
       </div>
 
       <div className="rounded border p-4" style={{ background: 'var(--surf)', borderColor: 'var(--border)' }}>
         <div className="flex items-center gap-2 mb-2">
           <AlertTriangle size={13} style={{ color: 'var(--pink)' }} />
-          <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Errores</span>
+          <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--muted)' }}>Errors</span>
         </div>
         <p className="text-2xl font-bold" style={{ fontFamily: 'Orbitron, sans-serif', color: summary.errors > 0 ? 'var(--pink)' : 'var(--txt)' }}>{summary.errors}</p>
-        <p className="text-[9px] mt-1" style={{ color: 'var(--muted)' }}>jobs con error</p>
+        <p className="text-[9px] mt-1" style={{ color: 'var(--muted)' }}>jobs with errors</p>
       </div>
 
       <div className="rounded border p-4" style={{ background: 'var(--surf)', borderColor: 'var(--border)' }}>
@@ -283,10 +283,10 @@ export default function JobsPage() {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <AlertTriangle size={32} style={{ color: 'var(--pink)' }} className="mx-auto mb-2" />
-          <p style={{ color: 'var(--txt)' }}>No se pudo cargar el Jobs Feed</p>
-          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>¿Está Hermes corriendo?</p>
+          <p style={{ color: 'var(--txt)' }}>Failed to load Jobs Feed</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>Is Hermes running?</p>
           <button onClick={() => refetch()} className="mt-3 px-4 py-2 rounded border text-xs" style={{ borderColor: 'var(--border)', color: 'var(--txt)' }}>
-            Reintentar
+            Retry
           </button>
         </div>
       </div>
@@ -304,7 +304,7 @@ export default function JobsPage() {
             Jobs Feed
           </h1>
           <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-            Ultima actualizacion: {timeAgo(data.updated_at)}
+            Last updated: {timeAgo(data.updated_at)}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -318,14 +318,14 @@ export default function JobsPage() {
             }}
           >
             <RefreshCw size={11} className={autoRefresh ? 'animate-spin' : ''} style={{ animationDuration: '3s' }} />
-            Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
+            Auto {autoRefresh ? 'ON' : 'OFF'}
           </button>
           <button
             onClick={() => refetch()}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded border text-xs"
             style={{ borderColor: 'var(--border)', color: 'var(--txt)' }}
           >
-            <RefreshCw size={11} /> Actualizar
+            <RefreshCw size={11} /> Refresh
           </button>
         </div>
       </div>
@@ -335,7 +335,7 @@ export default function JobsPage() {
 
       {/* Active Sessions */}
       {sessions.active.length > 0 && (
-        <Section title="Sesiones Activas" icon={<Activity size={13} />} count={sessions.active.length} accentColor="var(--primary)">
+        <Section title="Active Sessions" icon={<Activity size={13} />} count={sessions.active.length} accentColor="var(--primary)">
           {sessions.active.map(s => <SessionCard key={s.id} session={s} />)}
         </Section>
       )}
@@ -343,7 +343,7 @@ export default function JobsPage() {
       {/* Scheduled Jobs */}
       <Section title="Cron Jobs" icon={<Clock size={13} />} count={jobs.scheduled.length} accentColor="var(--accent)">
         {jobs.scheduled.length === 0 ? (
-          <p className="text-xs py-2" style={{ color: 'var(--muted)' }}>Sin jobs programados</p>
+          <p className="text-xs py-2" style={{ color: 'var(--muted)' }}>No scheduled jobs</p>
         ) : (
           jobs.scheduled.map(j => <JobCard key={j.id} job={j} />)
         )}
@@ -351,21 +351,21 @@ export default function JobsPage() {
 
       {/* Paused Jobs */}
       {jobs.paused.length > 0 && (
-        <Section title="Pausados" icon={<Pause size={13} />} count={jobs.paused.length} accentColor="var(--muted)">
+        <Section title="Paused" icon={<Pause size={13} />} count={jobs.paused.length} accentColor="var(--muted)">
           {jobs.paused.map(j => <JobCard key={j.id} job={j} />)}
         </Section>
       )}
 
       {/* Error Jobs */}
       {jobs.errors.length > 0 && (
-        <Section title="Errores" icon={<AlertTriangle size={13} />} count={jobs.errors.length} accentColor="var(--pink)">
+        <Section title="Errors" icon={<AlertTriangle size={13} />} count={jobs.errors.length} accentColor="var(--pink)">
           {jobs.errors.map(j => <JobCard key={j.id} job={j} />)}
         </Section>
       )}
 
       {/* Recent Sessions */}
       {sessions.recent.length > 0 && (
-        <Section title="Sesiones Recientes" icon={<MessageSquare size={13} />} count={sessions.recent.length} accentColor="var(--primary)">
+        <Section title="Recent Sessions" icon={<MessageSquare size={13} />} count={sessions.recent.length} accentColor="var(--primary)">
           {sessions.recent.map(s => <SessionCard key={s.id} session={s} />)}
         </Section>
       )}

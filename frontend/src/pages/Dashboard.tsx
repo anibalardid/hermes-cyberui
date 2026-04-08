@@ -114,6 +114,29 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+            {sys?.cpu_percent != null && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
+                  <span style={{ color: '#9ca3af' }}><Cpu size={12} style={{ display: 'inline', marginRight: '4px' }} />CPU</span>
+                  <span style={{ color: '#f5d400' }}>{sys.cpu_percent}%</span>
+                </div>
+                <div className="progress" style={{ background: '#1c2333' }}>
+                  <div className="progress-bar" style={{ width: `${sys.cpu_percent}%`, background: 'linear-gradient(90deg, #f5d400, #ff2a6d)' }} />
+                </div>
+                {sys?.cpu_per_core && sys.cpu_per_core.length > 0 && (
+                  <div style={{ display: 'flex', gap: '3px', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                    {sys.cpu_per_core.map((p: number, i: number) => (
+                      <div key={i} style={{
+                        flex: '1 1 auto', minWidth: '28px', maxWidth: '36px',
+                        height: '6px', borderRadius: '2px',
+                        background: p > 80 ? '#ff2a6d' : p > 50 ? '#f5d400' : 'rgba(0,255,65,0.3)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                      }} title={`Core ${i}: ${p}%`} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

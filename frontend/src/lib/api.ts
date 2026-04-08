@@ -251,6 +251,8 @@ export interface SystemInfo {
   platform_version: string
   hostname: string
   cpu_count: number
+  cpu_percent: number | null
+  cpu_per_core: number[] | null
   memory_total_gb: number | null
   memory_used_gb: number | null
   memory_percent: number | null

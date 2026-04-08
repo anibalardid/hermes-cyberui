@@ -62,15 +62,21 @@ async def system_info():
     try:
         mem = psutil.virtual_memory()
         disk = psutil.disk_usage("/")
+        cpu_percent = psutil.cpu_percent(interval=0.5)
+        cpu_per_core = psutil.cpu_percent(interval=0.5, percpu=True)
     except Exception:
         mem = None
         disk = None
+        cpu_percent = None
+        cpu_per_core = None
 
     return {
         "platform": platform.system(),
         "platform_version": platform.version(),
         "hostname": platform.node(),
         "cpu_count": os.cpu_count(),
+        "cpu_percent": cpu_percent,
+        "cpu_per_core": cpu_per_core,
         "memory_total_gb": round(mem.total / (1024**3), 1) if mem else None,
         "memory_used_gb": round(mem.used / (1024**3), 1) if mem else None,
         "memory_percent": mem.percent if mem else None,
