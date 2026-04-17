@@ -29,11 +29,14 @@ from routers.system import router as system_router
 from routers.files import router as files_router
 from routers.jobs import router as jobs_router
 from routers.config import router as config_router
+from routers.tasks import router as tasks_router, _clear_all_task_locks, _reset_stale_in_progress_tasks
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("[CyberUI] Backend starting...")
+    _clear_all_task_locks()  # Reset stale execution state from previous runs
+    _reset_stale_in_progress_tasks()  # Reset tasks stuck in in_progress from crashed runs
     yield
     print("[CyberUI] Backend shutting down...")
 
@@ -72,6 +75,7 @@ app.include_router(system_router, prefix="/api/system", tags=["system"])
 app.include_router(files_router, prefix="/api/files", tags=["files"])
 app.include_router(jobs_router, prefix="/api/jobs", tags=["jobs"])
 app.include_router(config_router, prefix="/api/config", tags=["config"])
+app.include_router(tasks_router, prefix="/api/tasks", tags=["tasks"])
 
 # Health check
 @app.get("/health")

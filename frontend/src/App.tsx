@@ -14,6 +14,7 @@ import Settings from './pages/Settings'
 import Files from './pages/Files'
 import Jobs from './pages/Jobs'
 import Config from './pages/Config'
+import Kanban from './pages/Kanban'
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/files" element={<Files />} />
         <Route path="/jobs" element={<Jobs />} />
+        <Route path="/kanban" element={<Kanban />} />
         <Route path="/config" element={<Config />} />
       </Route>
     </Routes>

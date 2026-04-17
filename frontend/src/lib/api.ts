@@ -348,6 +348,48 @@ export const jobsApi = {
   history: (jobId: string) => api.get<{ job: JobInfo }>(`/jobs/${jobId}/history`).then(r => r.data),
 }
 
+// ── Tasks ──────────────────────────────────────────────────────────────────────
+export interface Task {
+  id: string
+  title: string
+  description: string
+  status: 'backlog' | 'todo' | 'in_progress' | 'done'
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  tags: string[]
+  profile: string
+  due_date: string | null
+  created_at: string
+  updated_at: string
+  history: TaskHistoryEntry[]
+}
+
+export interface TaskHistoryEntry {
+  timestamp: string
+  action: string
+  from_status: string | null
+  to_status: string | null
+  note: string | null
+  details: Record<string, unknown> | null
+}
+
+export const tasksApi = {
+  list: () => api.get<{ tasks: Task[]; updated_at: string }>('/tasks').then(r => r.data),
+  get: (id: string) => api.get<Task>(`/tasks/${id}`).then(r => r.data),
+  create: (data: Partial<Task>) => api.post<Task>('/tasks', data).then(r => r.data),
+  update: (id: string, data: Partial<Task>) => api.put<Task>(`/tasks/${id}`, data).then(r => r.data),
+  move: (id: string, status: string) => api.patch<Task>(`/tasks/${id}/status`, { status }).then(r => r.data),
+  execute: (id: string) => api.post<Task>(`/tasks/${id}/execute`).then(r => r.data),
+  archive: (id: string) => api.post<Task>(`/tasks/${id}/archive`).then(r => r.data),
+  archiveAllDone: () => api.post<{ archived_count: number }>('/tasks/archive-all-done').then(r => r.data),
+  delete: (id: string) => api.delete(`/tasks/${id}`).then(r => r.data),
+  getHistory: (id: string) => api.get<{ history: TaskHistoryEntry[] }>(`/tasks/${id}/history`).then(r => r.data),
+  addHistoryNote: (id: string, note: string) =>
+    api.post(`/tasks/${id}/history`, { note }).then(r => r.data),
+  listArchived: () => api.get<{ archived: Task[] }>('/tasks/archived/list').then(r => r.data),
+  restore: (id: string) => api.post<Task>(`/tasks/${id}/restore`).then(r => r.data),
+  gatewayStatus: () => api.get<{ ticker_alive: boolean; last_tick_age_secs: number | null; gateway_pid: number | null; error?: string }>('/tasks/gateway/status').then(r => r.data),
+}
+
 // ── Config ─────────────────────────────────────────────────────────────────
 export const configApi = {
   get: () => api.get<ConfigData>('/config').then(r => r.data),

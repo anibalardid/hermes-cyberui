@@ -312,3 +312,45 @@ body{height:100%;margin:0;padding:0;overflow:hidden;font-family:'JetBrains Mono'
 .theme-light .badge-green{background:rgba(0,170,42,0.1);color:#004400;border-color:rgba(0,170,42,0.3)}
 .theme-light .badge-blue{background:rgba(0,136,204,0.1);color:#004488;border-color:rgba(0,136,204,0.3)}
 .theme-light .badge-purple{background:rgba(136,0,204,0.1);color:#440066;border-color:rgba(136,0,204,0.3)}
+
+/* ── Markdown Response ─────────────────── */
+.response-markdown{font-size:0.8rem;line-height:1.6;word-break:break-word;overflow-wrap:break-word}
+.response-markdown h1,.response-markdown h2,.response-markdown h3,.response-markdown h4,.response-markdown h5,.response-markdown h6{color:var(--primary);font-family:'Orbitron',sans-serif;margin:0.75rem 0 0.4rem;font-weight:700;letter-spacing:0.02em}
+.response-markdown h1{font-size:1.3rem;text-shadow:0 0 8px rgba(0,255,65,0.3)}
+.response-markdown h2{font-size:1.1rem}
+.response-markdown h3{font-size:0.95rem}
+.response-markdown h4{font-size:0.85rem}
+.response-markdown h5,.response-markdown h6{font-size:0.8rem;color:var(--accent)}
+.response-markdown p{margin:0.5rem 0}
+.response-markdown ul,.response-markdown ol{margin:0.5rem 0;padding-left:1.5rem}
+.response-markdown ul{list-style:disc}
+.response-markdown ol{list-style:decimal}
+.response-markdown li{margin:0.2rem 0}
+.response-markdown code{background:rgba(0,255,65,0.08);border:1px solid rgba(0,255,65,0.15);border-radius:0.2rem;padding:0.1rem 0.35rem;font-size:0.78rem;color:var(--primary);font-family:'JetBrains Mono','Share Tech Mono',monospace}
+.response-markdown pre{background:rgba(0,0,0,0.35);border:1px solid rgba(0,255,65,0.2);border-radius:0.4rem;padding:0.75rem 1rem;overflow-x:auto;margin:0.5rem 0}
+.response-markdown pre code{background:none;border:none;padding:0;font-size:0.78rem;color:#e8e8e8}
+.response-markdown blockquote{border-left:3px solid var(--accent);margin:0.75rem 0;padding:0.4rem 0.75rem;color:var(--muted);font-style:italic;background:rgba(5,217,232,0.04);border-radius:0 0.3rem 0.3rem 0}
+.response-markdown a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.response-markdown a:hover{color:var(--primary)}
+.response-markdown hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
+.response-markdown table{border-collapse:collapse;width:100%;margin:0.5rem 0}
+.response-markdown th,.response-markdown td{border:1px solid var(--border);padding:0.4rem 0.6rem;font-size:0.78rem;text-align:left}
+.response-markdown th{background:rgba(0,255,65,0.06);color:var(--primary);font-weight:600}
+.response-markdown img{max-width:100%;border-radius:0.3rem}
+.response-markdown strong{color:var(--txt);font-weight:700}
+.response-markdown em{color:var(--accent)}
+
+/* ── Failed task styling ─────────────────────────────────────────────────── */
+.task-card-failed-badge{
+  display:inline-flex;align-items:center;gap:0.2rem;
+  font-size:0.6rem;font-weight:700;text-transform:uppercase;
+  padding:0.1rem 0.35rem;border-radius:0.2rem;
+  background:rgba(255,42,109,0.15);color:var(--pink);
+  border:1px solid rgba(255,42,109,0.3);
+}
+
+/* ── Gateway warning banner animation ────────────────────────────────────── */
+@keyframes warning-pulse {
+  0%,100%{opacity:1} 50%{opacity:0.7}
+}
+.gateway-warning-banner{animation:warning-pulse 3s ease-in-out infinite}

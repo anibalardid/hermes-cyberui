@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Outlet, NavLink } from 'react-router-dom'
+import { Outlet, NavLink, Link } from 'react-router-dom'
 import { useAppStore } from '../stores/appStore'
 import {
   LayoutDashboard, MessageSquare, Brain, Database,
   Settings, ChevronLeft, ChevronRight, Terminal,
-  Clock, Puzzle, FileText, UserCircle, Bot, Eye, FolderOpen, Menu, X, Activity, UserCheck
+  Clock, Puzzle, FileText, UserCircle, Bot, Eye, FolderOpen, Menu, X, Activity, UserCheck, Kanban
 } from 'lucide-react'
 
 const NAV = [
@@ -14,6 +14,7 @@ const NAV = [
   { to: '/memory', icon: Database, label: 'Memory' },
   { to: '/crons', icon: Clock, label: 'Crons' },
   { to: '/jobs', icon: Activity, label: 'Jobs' },
+  { to: '/kanban', icon: Kanban, label: 'Tasks' },
   { to: '/plugins', icon: Puzzle, label: 'Plugins' },
   { to: '/files', icon: FolderOpen, label: 'Files' },
   { to: '/logs', icon: FileText, label: 'Logs' },
@@ -102,45 +103,49 @@ export default function Layout() {
       overflow: 'hidden',
       flexShrink: 0,
     }}>
-      {/* Logo */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem',
-        padding: '1rem 0.75rem',
-        borderBottom: '1px solid var(--border)',
-        flexShrink: 0,
-      }}>
-        <div style={{
-          width: '1.75rem',
-          height: '1.75rem',
-          borderRadius: '0.25rem',
-          background: 'var(--primary)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-        }}>
-          <Terminal size={14} style={{ color: 'var(--bg)' }} />
-        </div>
-        {sidebarOpen && (
-          <div style={{ overflow: 'hidden' }}>
-            <div style={{
-              fontFamily: 'Orbitron, sans-serif',
-              fontWeight: 700,
-              fontSize: '0.875rem',
-              lineHeight: 1.2,
-              color: 'var(--primary)',
-            }}>HERMES</div>
-            <div style={{
-              fontSize: '0.45rem',
-              letterSpacing: '0.15em',
-              textTransform: 'uppercase',
-              color: 'var(--pink)',
-            }}>CyberUI</div>
+        {/* Logo */}
+        <Link
+          to="/"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '1rem 0.75rem',
+            borderBottom: '1px solid var(--border)',
+            flexShrink: 0,
+            textDecoration: 'none',
+          }}
+        >
+          <div style={{
+            width: '1.75rem',
+            height: '1.75rem',
+            borderRadius: '0.25rem',
+            background: 'var(--primary)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <Terminal size={14} style={{ color: 'var(--bg)' }} />
           </div>
-        )}
-      </div>
+          {sidebarOpen && (
+            <div style={{ overflow: 'hidden' }}>
+              <div style={{
+                fontFamily: 'Orbitron, sans-serif',
+                fontWeight: 700,
+                fontSize: '0.875rem',
+                lineHeight: 1.2,
+                color: 'var(--primary)',
+              }}>HERMES</div>
+              <div style={{
+                fontSize: '0.45rem',
+                letterSpacing: '0.15em',
+                textTransform: 'uppercase',
+                color: 'var(--pink)',
+              }}>CyberUI</div>
+            </div>
+          )}
+        </Link>
 
       {/* Nav */}
       <nav style={{
@@ -247,7 +252,7 @@ export default function Layout() {
           borderBottom: '1px solid var(--border)',
           flexShrink: 0,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}>
             <div style={{
               width: '1.75rem',
               height: '1.75rem',
@@ -275,7 +280,7 @@ export default function Layout() {
                 color: 'var(--pink)',
               }}>CyberUI</div>
             </div>
-          </div>
+          </Link>
           <button
             onClick={() => setMobileOpen(false)}
             style={{

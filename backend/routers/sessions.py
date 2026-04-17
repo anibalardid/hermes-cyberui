@@ -4,10 +4,9 @@ List, view, create, update, delete, and stream chat sessions.
 """
 import asyncio
 import json
-import queue
 import re
-import threading
 import uuid
+import httpx
 from datetime import datetime
 from pathlib import Path
 
@@ -17,6 +16,7 @@ from pydantic import BaseModel
 
 router = APIRouter()
 SESSION_DIR = Path.home() / ".hermes" / "sessions"
+API_SERVER_URL = "http://127.0.0.1:8642"
 
 
 # ── Models ───────────────────────────────────────────────────────────────────
@@ -57,153 +57,218 @@ def _session_title_from_messages(messages: list[dict]) -> str:
 # ── Load session messages (both formats) ─────────────────────────────────────
 
 def _load_session_messages(session_id: str) -> list[dict]:
-    """Load messages from a session file. Handles both JSON and JSONL formats."""
-    # Try JSON format first
-    json_path = SESSION_DIR / f"{session_id}.json"
-    if json_path.exists():
-        try:
-            data = json.loads(json_path.read_text())
-            messages = data.get("messages", [])
+    """Load messages for a session from SessionDB (preferred) or JSONL file."""
+    # Normalize: strip "session_" prefix if present
+    normalized_id = session_id[8:] if session_id.startswith("session_") else session_id
+
+    # Try SessionDB first (most complete, has timestamps)
+    db_messages = _load_session_from_db(normalized_id)
+    if db_messages:
+        return db_messages
+
+    # Fall back to JSONL format — try both with and without session_ prefix
+    # (some files were created with the prefix in the filename)
+    for candidate in (f"{normalized_id}.jsonl", f"session_{normalized_id}.jsonl"):
+        jsonl_path = SESSION_DIR / candidate
+        if jsonl_path.exists():
+            messages = []
+            for line in jsonl_path.read_text().splitlines():
+                line = line.strip()
+                if line:
+                    try:
+                        messages.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        pass
             if messages:
                 return messages
-        except (json.JSONDecodeError, OSError):
-            pass
 
-    # Fall back to JSONL format
-    jsonl_path = SESSION_DIR / f"{session_id}.jsonl"
-    if jsonl_path.exists():
-        messages = []
-        for line in jsonl_path.read_text().splitlines():
-            line = line.strip()
-            if line:
-                try:
-                    messages.append(json.loads(line))
-                except json.JSONDecodeError:
-                    pass
-        return messages
+    # Fall back to JSON format — try both with and without session_ prefix
+    for candidate in (f"{normalized_id}.json", f"session_{normalized_id}.json"):
+        json_path = SESSION_DIR / candidate
+        if json_path.exists():
+            try:
+                data = json.loads(json_path.read_text())
+                return data.get("messages", [])
+            except (json.JSONDecodeError, OSError):
+                pass
 
     raise FileNotFoundError(f"Session {session_id} not found")
 
 
-# ── List sessions (both formats, merged, sorted by mtime) ────────────────────
+def _load_session_from_db(session_id: str) -> list[dict] | None:
+    """Load messages from SessionDB if available."""
+    try:
+        import sys
+        hermes_agent_path = Path.home() / ".hermes" / "hermes-agent"
+        if not hermes_agent_path.exists():
+            return None
+        sys.path.insert(0, str(hermes_agent_path))
+        from hermes_state import SessionDB
+        db = SessionDB()
+        messages = db.get_messages_as_conversation(session_id)
+        return messages if messages else None
+    except Exception:
+        return None
+
+
+def _list_sessions_from_db() -> list[dict]:
+    """List sessions from SessionDB."""
+    try:
+        import sys
+        hermes_agent_path = Path.home() / ".hermes" / "hermes-agent"
+        if not hermes_agent_path.exists():
+            return []
+        sys.path.insert(0, str(hermes_agent_path))
+        from hermes_state import SessionDB
+        db = SessionDB()
+        conn = db._conn
+        cur = conn.execute(
+            "SELECT id, source, model, message_count, title, started_at FROM sessions ORDER BY started_at DESC"
+        )
+        sessions = []
+        for row in cur.fetchall():
+            sid, source, model, msg_count, title, started_at = row
+            # Skip cron/one-off sessions
+            if sid.startswith("session_cron_"):
+                continue
+            # Format timestamp
+            try:
+                updated_dt = datetime.fromtimestamp(started_at)
+                updated = updated_dt.isoformat()
+            except (ValueError, OSError):
+                updated = datetime.now().isoformat()
+            # Derive title from messages if DB title is missing
+            if not title:
+                try:
+                    msgs = db.get_messages_as_conversation(sid)
+                    title = _session_title_from_messages(msgs) if msgs else None
+                except Exception:
+                    title = None
+            sessions.append({
+                "id": sid,
+                "title": title or f"Session {sid[:12]}",
+                "created": updated,
+                "updated": updated,
+                "message_count": msg_count or 0,
+                "model": model,
+                "platform": source,
+                "source": "db",
+            })
+        return sessions
+    except Exception:
+        return []
+
+
+# ── List sessions (both sources, merged, sorted by mtime) ────────────────────
 
 def _list_sessions() -> list[dict]:
     SESSION_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Collect all session files (both formats, excluding request dumps)
-    session_files: list[tuple[Path, str]] = []  # (path, session_id)
+    # Collect IDs already covered by DB (to avoid duplicating from JSONL)
+    db_sessions = _list_sessions_from_db()
+    db_ids = {s["id"] for s in db_sessions}
 
+    # Build a map of session_id -> session dict for fast lookup
+    sessions_map: dict[str, dict] = {s["id"]: s for s in db_sessions}
+
+    # Add JSONL sessions that don't overlap with DB
     for sf in SESSION_DIR.iterdir():
         if not sf.is_file():
             continue
         name = sf.name
-        # Skip request dumps and non-session files
         if name.startswith("request_dump_"):
             continue
+        # Determine session ID (strip "session_" prefix if present)
         if name.startswith("session_") and name.endswith(".json"):
-            sid = sf.stem  # e.g. "session_20260407_015156_c6f38e"
-            session_files.append((sf, sid))
+            sid = sf.stem  # e.g. "session_20260407_205252_58e3c3"
         elif name.endswith(".jsonl"):
             sid = sf.stem
-            session_files.append((sf, sid))
-
-    sessions = []
-    for sf, sid in session_files:
-        try:
-            # Get file timestamps
-            try:
-                ctime = datetime.fromtimestamp(sf.stat().st_ctime)
-                mtime = datetime.fromtimestamp(sf.stat().st_mtime)
-            except OSError:
-                ctime = mtime = datetime.now()
-
-            messages: list[dict] = []
-            model: str | None = None
-            platform: str | None = None
-            message_count = 0
-
-            if _is_json_format(sf):
-                # JSON format: single JSON object
-                try:
-                    data = json.loads(sf.read_text())
-                    messages = data.get("messages", [])
-                    model = data.get("model")
-                    platform = data.get("platform")
-                    message_count = data.get("message_count", len(messages))
-                    # Use last_updated if available, else mtime
-                    last_updated_str = data.get("last_updated")
-                    if last_updated_str:
-                        try:
-                            updated = datetime.fromisoformat(last_updated_str.replace("Z", "+00:00"))
-                        except ValueError:
-                            updated = mtime
-                    else:
-                        updated = mtime
-                    created_str = data.get("session_start")
-                    if created_str:
-                        try:
-                            created = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
-                        except ValueError:
-                            created = ctime
-                    else:
-                        created = ctime
-                except (json.JSONDecodeError, OSError):
-                    continue
-            else:
-                # JSONL format: one JSON object per line
-                updated = mtime
-                created = ctime
-                for line in sf.read_text().splitlines():
-                    line = line.strip()
-                    if line:
-                        try:
-                            msg = json.loads(line)
-                            messages.append(msg)
-                            if not model:
-                                model = msg.get("model")
-                            if not platform:
-                                platform = msg.get("platform")
-                        except json.JSONDecodeError:
-                            pass
-                message_count = len(messages)
-
-            title = _session_title_from_messages(messages)
-            sessions.append({
-                "id": sid,
-                "title": title or f"Session {sid[:12]}",
-                "created": created.isoformat(),
-                "updated": updated.isoformat(),
-                "message_count": message_count,
-                "model": model,
-                "platform": platform,
-            })
-        except Exception:
+        else:
             continue
 
-    # Sort by updated desc
-    sessions.sort(key=lambda s: s.get("updated", ""), reverse=True)
-    return sessions
+        # Normalize: strip "session_" prefix so it matches DB IDs
+        normalized_sid = sid[8:] if sid.startswith("session_") else sid
+
+        # Skip if already in DB
+        if normalized_sid in db_ids:
+            continue
+
+        # Get file timestamps
+        try:
+            ctime = datetime.fromtimestamp(sf.stat().st_ctime)
+            mtime = datetime.fromtimestamp(sf.stat().st_mtime)
+        except OSError:
+            ctime = mtime = datetime.now()
+
+        messages: list[dict] = []
+        model: str | None = None
+        platform: str | None = None
+        message_count = 0
+
+        if name.endswith(".json"):
+            try:
+                data = json.loads(sf.read_text())
+                messages = data.get("messages", [])
+                model = data.get("model")
+                platform = data.get("platform")
+                message_count = data.get("message_count", len(messages))
+                last_updated_str = data.get("last_updated")
+                if last_updated_str:
+                    try:
+                        updated = datetime.fromisoformat(last_updated_str.replace("Z", "+00:00"))
+                    except ValueError:
+                        updated = mtime
+                else:
+                    updated = mtime
+                created_str = data.get("session_start")
+                if created_str:
+                    try:
+                        created = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+                    except ValueError:
+                        created = ctime
+                else:
+                    created = ctime
+            except (json.JSONDecodeError, OSError):
+                continue
+        else:
+            updated = mtime
+            created = ctime
+            for line in sf.read_text().splitlines():
+                line = line.strip()
+                if line:
+                    try:
+                        msg = json.loads(line)
+                        messages.append(msg)
+                        if not model:
+                            model = msg.get("model")
+                        if not platform:
+                            platform = msg.get("platform")
+                    except json.JSONDecodeError:
+                        pass
+            message_count = len(messages)
+
+        title = _session_title_from_messages(messages)
+        sessions_map[normalized_sid] = {
+            "id": normalized_sid,
+            "title": title or f"Session {sid[:12]}",
+            "created": created.isoformat(),
+            "updated": updated.isoformat(),
+            "message_count": message_count,
+            "model": model,
+            "platform": platform,
+            "source": "jsonl",
+        }
+
+    # Sort all sessions by updated desc
+    result = list(sessions_map.values())
+    result.sort(key=lambda s: s.get("updated", ""), reverse=True)
+    return result
 
 
 def _save_message(session_id: str, msg: dict):
     SESSION_DIR.mkdir(parents=True, exist_ok=True)
     sf = SESSION_DIR / f"{session_id}.jsonl"
     sf.open("a").write(json.dumps(msg, ensure_ascii=False) + "\n")
-
-
-# ── Streaming stub ───────────────────────────────────────────────────────────
-
-def _stub_streaming(session_id: str, message: str, callback, error_callback, done_callback):
-    """Stub streaming that echoes the message."""
-    try:
-        import time
-        words = ["Hermes", "CyberUI", "is", "running.", "Chat", "streaming", "will", "work", "once", "hermes-webui", "dependencies", "are", "available."]
-        for word in words:
-            callback(word + " ", {})
-            time.sleep(0.1)
-        done_callback()
-    except Exception as e:
-        error_callback(str(e))
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -265,8 +330,8 @@ async def delete_session(session_id: str):
 @router.post("/{session_id}/chat")
 async def chat_in_session(session_id: str, body: ChatRequest):
     """
-    Send a message in a session and stream the response.
-    Uses hermes-webui streaming if available, falls back to stub.
+    Send a message in a session and stream the response via the Hermes API server.
+    Transforms OpenAI SSE format to the frontend's expected {token: ...} format.
     """
     # Validate session exists
     found = False
@@ -277,55 +342,86 @@ async def chat_in_session(session_id: str, body: ChatRequest):
     if not found:
         raise HTTPException(404, "Session not found")
 
-    # Save user message
-    _save_message(session_id, {"role": "user", "content": body.message})
+    # Load conversation history for this session
+    conversation_messages = _load_session_messages(session_id)
 
-    # Try hermes-webui streaming
-    _streaming_fn = None
-    try:
-        import sys
-        hermes_path = Path.home() / ".hermes" / "hermes-webui"
-        if hermes_path.exists():
-            sys.path.insert(0, str(hermes_path))
-            from api.streaming import _run_agent_streaming
-            _streaming_fn = _run_agent_streaming
-    except Exception:
-        pass
+    # Build the messages array for the API server (system + history + new user message)
+    messages = []
+    for msg in conversation_messages:
+        role = msg.get("role")
+        if role in ("user", "assistant"):
+            content = msg.get("content", "")
+            if content:
+                messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": body.message})
 
-    q: queue.Queue = queue.Queue()
-
-    def callback(token: str, meta: dict):
-        q.put(("token", token))
-
-    def error_callback(err: str):
-        q.put(("error", err))
-
-    def done_callback():
-        q.put(("done", ""))
-
-    fn = _streaming_fn if _streaming_fn else _stub_streaming
-    t = threading.Thread(
-        target=fn,
-        args=(session_id, body.message, callback, error_callback, done_callback),
-        daemon=True,
-    )
-    t.start()
+    # Build the API server payload
+    payload = {
+        "model": body.model or "hermes-agent",
+        "messages": messages,
+        "stream": True,
+    }
 
     async def event_generator():
-        while True:
-            await asyncio.sleep(0.05)
+        # Save user message to session file
+        _save_message(session_id, {"role": "user", "content": body.message})
+
+        accumulated_response = ""
+
+        async with httpx.AsyncClient(timeout=httpx.Timeout(300.0)) as client:
+            headers = {"Content-Type": "application/json"}
+            # Pass session ID so API server maintains conversation context
+            headers["X-Hermes-Session-Id"] = session_id
+
             try:
-                item = q.get_nowait()
-            except queue.Empty:
-                continue
-            if item[0] == "token":
-                yield f"data: {json.dumps({'token': item[1]})}\n\n"
-            elif item[0] == "error":
-                yield f"data: {json.dumps({'error': item[1]})}\n\n"
-                break
-            elif item[0] == "done":
+                async with client.stream(
+                    "POST",
+                    f"{API_SERVER_URL}/v1/chat/completions",
+                    json=payload,
+                    headers=headers,
+                ) as response:
+                    if response.status_code != 200:
+                        error_text = await response.aread()
+                        yield f"data: {json.dumps({'error': f'HTTP {response.status_code}: {error_text.decode()}'})}\n\n"
+                        yield f"data: {json.dumps({'done': True})}\n\n"
+                        return
+
+                    # Read the SSE stream and transform to frontend format
+                    async for line in response.aiter_lines():
+                        line = line.strip()
+                        if not line.startswith("data: "):
+                            continue
+                        data_str = line[6:].strip()
+                        if data_str == "[DONE]":
+                            # Save assistant response to session file
+                            if accumulated_response:
+                                _save_message(session_id, {"role": "assistant", "content": accumulated_response})
+                            yield f"data: {json.dumps({'done': True})}\n\n"
+                            return
+
+                        try:
+                            data = json.loads(data_str)
+                        except json.JSONDecodeError:
+                            continue
+
+                        # OpenAI SSE: choices[0].delta.content
+                        choices = data.get("choices", [])
+                        if choices:
+                            delta = choices[0].get("delta", {})
+                            content = delta.get("content")
+                            if content:
+                                accumulated_response += content
+                                yield f"data: {json.dumps({'token': content})}\n\n"
+
+                        # Handle errors in the stream
+                        if data.get("error"):
+                            yield f"data: {json.dumps({'error': data['error']})}\n\n"
+            except httpx.TimeoutException:
+                yield f"data: {json.dumps({'error': 'Request timed out after 300 seconds'})}\n\n"
                 yield f"data: {json.dumps({'done': True})}\n\n"
-                break
+            except httpx.HTTPError as e:
+                yield f"data: {json.dumps({'error': f'HTTP error: {e}'})}\n\n"
+                yield f"data: {json.dumps({'done': True})}\n\n"
 
     return StreamingResponse(
         event_generator(),

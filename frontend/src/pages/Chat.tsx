@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sessionsApi } from '../lib/api'
 import { useIsMobile } from '../hooks/useIsMobile'
-import { ArrowLeft, Send, Info, PanelRightClose, PanelRightOpen, Bot, User } from 'lucide-react'
+import { ArrowLeft, Send, Info, PanelRightClose, PanelRightOpen, Bot, User, Wrench } from 'lucide-react'
 
 const SIDEBAR_STORAGE_KEY = 'hermes-chat-sidebar-width'
 
@@ -150,7 +150,28 @@ export default function Chat() {
   }
 
   const messages = data?.messages ?? []
-  const recentMessages = messages.slice(-20)
+  // Activity shows all messages (up to 200 to avoid performance issues)
+  const recentMessages = messages.slice(-200)
+
+  // Normalize messages: ensure timestamp field exists
+  const normalizedMessages = recentMessages.map((msg: any, idx: number) => ({
+    ...msg,
+    _ts: msg.timestamp
+      ? new Date(msg.timestamp).getTime()
+      : Date.now() - (recentMessages.length - idx) * 1000,
+  }))
+
+  // Filter: main chat shows user + assistant messages with actual content
+  // Tool-related messages (role=tool or assistant with only tool_calls) go to sidebar
+  const chatMessages = normalizedMessages.filter((msg: any) => {
+    if (msg.role === 'user') return true
+    if (msg.role === 'tool') return false
+    if (msg.role === 'assistant') {
+      // Show if has actual text content (not just tool_calls)
+      return !!(msg.content && msg.content.trim())
+    }
+    return false
+  })
 
   return (
     <div className="flex h-full" style={{ background: 'var(--bg)' }}>
@@ -166,10 +187,10 @@ export default function Chat() {
           </Link>
           <div className="flex-1 min-w-0">
             <p className="font-medium truncate" style={{ color: 'var(--txt)', fontSize: '13px' }}>
-              {messages[0]?.content?.slice(0, 60) || 'New Session'}
+              {chatMessages[0]?.content?.slice(0, 60) || 'New Session'}
             </p>
             <p className="text-xs" style={{ color: 'var(--muted)' }}>
-              {messages.length} messages
+              {chatMessages.length} messages
               {streaming && (
                 <span className="ml-2" style={{ color: 'var(--primary)' }}>● streaming</span>
               )}
@@ -210,13 +231,25 @@ export default function Chat() {
             </div>
           ) : (
             <>
-              {messages.map((msg, i) => (
+              {chatMessages.map((msg: any, i: number) => {
+                const ts = msg._ts ? new Date(msg._ts) : null
+                const timeStr = ts ? ts.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : null
+                return (
                 <div key={i} className="space-y-1">
                   <div
-                    className="text-xs px-1 font-display tracking-widest"
-                    style={{ color: msg.role === 'user' ? 'var(--accent)' : 'var(--primary)' }}
+                    className="flex items-center gap-2 px-1"
                   >
-                    {msg.role === 'user' ? 'USER' : msg.role === 'assistant' ? 'HERMES' : msg.role.toUpperCase()}
+                    <span
+                      className="text-xs px-1 font-display tracking-widest"
+                      style={{ color: msg.role === 'user' ? 'var(--accent)' : 'var(--primary)' }}
+                    >
+                      {msg.role === 'user' ? 'USER' : msg.role === 'assistant' ? 'HERMES' : msg.role.toUpperCase()}
+                    </span>
+                    {timeStr && (
+                      <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                        {timeStr}
+                      </span>
+                    )}
                   </div>
                   <div
                     className="rounded px-3 py-2"
@@ -230,7 +263,7 @@ export default function Chat() {
                     </p>
                   </div>
                 </div>
-              ))}
+              )})}
 
               {streaming && streamText && (
                 <div className="space-y-1">
@@ -353,33 +386,69 @@ export default function Chat() {
 
           {/* Activity feed */}
           <div className="flex-1 overflow-y-auto p-2 space-y-1.5" style={{ minHeight: 0 }}>
-            {recentMessages.map((msg, i) => (
+            {normalizedMessages.map((msg: any, i: number) => {
+              const isTool = msg.role === 'tool' || !!msg.tool_calls
+              const ts = msg._ts ? new Date(msg._ts) : null
+              const timeStr = ts ? ts.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : null
+              let displayContent: string
+              if (isTool) {
+                if (msg.tool_calls) {
+                  // Format tool calls nicely: name(arg1, arg2, ...)
+                  displayContent = msg.tool_calls.map((tc: any) => {
+                    const name = tc.function?.name || 'tool'
+                    const args = tc.function?.arguments || ''
+                    // Try to parse args as JSON and format nicely
+                    let argsStr = args
+                    try {
+                      const parsed = JSON.parse(args)
+                      argsStr = Object.entries(parsed).map(([k, v]) => `${k}=${typeof v === 'string' ? v.slice(0, 50) : JSON.stringify(v)}`).join(', ')
+                    } catch {}
+                    return `${name}(${argsStr})`
+                  }).join('\n')
+                } else {
+                  // Tool result — try to parse as JSON and extract "output" field
+                  const raw = msg.content || ''
+                  try {
+                    const parsed = JSON.parse(raw)
+                    displayContent = parsed.output || parsed.message || raw
+                  } catch {
+                    displayContent = raw
+                  }
+                }
+              } else {
+                displayContent = msg.content || ''
+              }
+              return (
               <div
                 key={i}
                 className="p-2 rounded text-xs"
-                style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
+                style={{ background: isTool ? 'rgba(212,0,255,0.05)' : 'var(--bg)', border: `1px solid ${isTool ? 'rgba(212,0,255,0.2)' : 'var(--border)'}` }}
               >
                 <div className="flex items-center gap-1.5 mb-1">
-                  {msg.role === 'user' ? (
+                  {isTool ? (
+                    <Wrench size={10} style={{ color: 'var(--accent)' }} />
+                  ) : msg.role === 'user' ? (
                     <User size={10} style={{ color: 'var(--accent)' }} />
                   ) : (
                     <Bot size={10} style={{ color: 'var(--primary)' }} />
                   )}
                   <span
                     className="font-bold uppercase tracking-wider"
-                    style={{ color: msg.role === 'user' ? 'var(--accent)' : 'var(--primary)', fontSize: '10px' }}
+                    style={{ color: isTool ? 'var(--accent)' : msg.role === 'user' ? 'var(--accent)' : 'var(--primary)', fontSize: '10px' }}
                   >
-                    {msg.role}
+                    {isTool ? 'tool' : msg.role}
                   </span>
-                  <span className="ml-auto" style={{ color: 'var(--muted)', fontSize: '9px' }}>
-                    {new Date((msg as any).timestamp || Date.now()).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+                  {timeStr && (
+                    <span className="ml-auto" style={{ color: 'var(--muted)', fontSize: '9px' }}>
+                      {timeStr}
+                    </span>
+                  )}
                 </div>
-                <p className="line-clamp-3 leading-relaxed" style={{ color: 'var(--txt)' }}>
-                  {msg.content}
+                <p className="leading-relaxed" style={{ color: 'var(--txt)', wordBreak: 'break-word' }}>
+                  {displayContent}
                 </p>
               </div>
-            ))}
+            )})}
           </div>
         </div>
       )}
