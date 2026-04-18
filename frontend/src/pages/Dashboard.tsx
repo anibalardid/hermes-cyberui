@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { systemApi, sessionsApi, skillsApi } from '../lib/api'
-import { Cpu, HardDrive, MemoryStick, MessageSquare, Brain, Zap, Globe, Link2, Coins } from 'lucide-react'
+import { Cpu, HardDrive, MemoryStick, MessageSquare, Brain, Zap, Globe, Link2, Coins, Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 function StatCard({ icon, label, value, sub, valueColor }: {
   icon: React.ReactNode
@@ -52,11 +53,23 @@ function PlatformBadge({ platform }: { platform: string | null | undefined }) {
 }
 
 export default function Dashboard() {
-  const { data: sys } = useQuery({ queryKey: ['system'], queryFn: systemApi.info })
+  const { data: sys, isLoading: sysLoading } = useQuery({ queryKey: ['system'], queryFn: systemApi.info })
   const { data: sessions } = useQuery({ queryKey: ['sessions'], queryFn: sessionsApi.list })
   const { data: skills } = useQuery({ queryKey: ['skills'], queryFn: skillsApi.list })
   const { data: network } = useQuery({ queryKey: ['network'], queryFn: systemApi.networkInfo })
   const { data: usage } = useQuery({ queryKey: ['usage'], queryFn: systemApi.usage })
+
+  const [showLoading, setShowLoading] = useState(false)
+
+  // Show loading toast after a brief delay to avoid flash on fast loads
+  useEffect(() => {
+    if (sysLoading) {
+      const t = setTimeout(() => setShowLoading(true), 300)
+      return () => clearTimeout(t)
+    } else {
+      setShowLoading(false)
+    }
+  }, [sysLoading])
 
   // Parse hostname cleanly (drop domain part)
   const hostname = sys?.hostname?.split('.')[0] ?? '—'
@@ -256,6 +269,23 @@ export default function Dashboard() {
               <a key={s.name} href="/skills" className="badge badge-green" style={{ textDecoration: 'none' }}>{s.name}</a>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Loading toast */}
+      {showLoading && (
+        <div style={{
+          position: 'fixed', top: '1.5rem', right: '1.5rem',
+          padding: '0.6rem 1rem',
+          background: 'var(--surf, #0d1117)',
+          color: 'var(--txt)',
+          borderRadius: '0.5rem', fontSize: '0.8rem', fontWeight: 500,
+          border: '1px solid var(--border, #30363d)',
+          zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
+        }}>
+          <Loader2 size={14} className="animate-spin" style={{ color: 'var(--primary)' }} />
+          Loading system data...
         </div>
       )}
     </div>

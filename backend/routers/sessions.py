@@ -1,14 +1,18 @@
 """
 Sessions router — fully standalone, supports both JSON and JSONL session formats.
 List, view, create, update, delete, and stream chat sessions.
+Supports persistent streams that survive client disconnects and page refreshes.
 """
 import asyncio
 import json
 import re
 import uuid
 import httpx
+import yaml
 from datetime import datetime
 from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -17,6 +21,72 @@ from pydantic import BaseModel
 router = APIRouter()
 SESSION_DIR = Path.home() / ".hermes" / "sessions"
 API_SERVER_URL = "http://127.0.0.1:8642"
+
+
+# ── Active Stream Store ───────────────────────────────────────────────────────
+# Keeps stream state alive even if the frontend disconnects, enabling
+# reconnection via GET /{id}/stream after page refresh.
+
+@dataclass
+class StreamState:
+    """Tracks an in-progress assistant response."""
+    session_id: str
+    accumulated: str = ""          # Full text generated so far
+    all_tokens: list[str] = field(default_factory=list)  # Every token event produced (for reconnect replay)
+    done: asyncio.Event = field(default_factory=asyncio.Event)    # Set when stream finishes
+    new_token: asyncio.Condition = field(default_factory=asyncio.Condition)  # Signal for new tokens
+    error: Optional[str] = None     # Error message if stream failed
+    saved: bool = False             # Whether response has been persisted to file
+    task: Optional[asyncio.Task] = None  # Background task reference
+
+
+class ActiveStreamStore:
+    """Global store of active streams, keyed by session_id."""
+
+    def __init__(self):
+        self._streams: dict[str, StreamState] = {}
+
+    def get(self, session_id: str) -> Optional[StreamState]:
+        return self._streams.get(session_id)
+
+    def create(self, session_id: str) -> StreamState:
+        # If there's already an active stream, cancel it
+        if session_id in self._streams:
+            old = self._streams[session_id]
+            if old.task and not old.task.done():
+                old.task.cancel()
+        state = StreamState(session_id=session_id)
+        self._streams[session_id] = state
+        return state
+
+    def remove(self, session_id: str):
+        self._streams.pop(session_id, None)
+
+    def has_active(self, session_id: str) -> bool:
+        state = self._streams.get(session_id)
+        if state is None:
+            return False
+        if state.done.is_set():
+            # Stream finished — clean up if we haven't already
+            return not state.saved  # Still not saved = something went wrong
+        return True
+
+active_streams = ActiveStreamStore()
+
+
+def _get_api_server_key() -> str:
+    """Read API_SERVER_KEY from hermes config.yaml (platforms.api_server.extra.key)."""
+    try:
+        cfg_path = Path.home() / ".hermes" / "config.yaml"
+        if not cfg_path.exists():
+            return ""
+        cfg = yaml.safe_load(cfg_path.read_text()) or {}
+        return (cfg.get("platforms", {})
+                .get("api_server", {})
+                .get("extra", {})
+                .get("key", ""))
+    except Exception:
+        return ""
 
 
 # ── Models ───────────────────────────────────────────────────────────────────
@@ -79,8 +149,8 @@ def _load_session_messages(session_id: str) -> list[dict]:
                         messages.append(json.loads(line))
                     except json.JSONDecodeError:
                         pass
-            if messages:
-                return messages
+            # Session file exists — return messages (even if empty for a new session)
+            return messages
 
     # Fall back to JSON format — try both with and without session_ prefix
     for candidate in (f"{normalized_id}.json", f"session_{normalized_id}.json"):
@@ -266,8 +336,20 @@ def _list_sessions() -> list[dict]:
 
 
 def _save_message(session_id: str, msg: dict):
+    """Append a message to the session JSONL file. Skips if identical to the last message."""
     SESSION_DIR.mkdir(parents=True, exist_ok=True)
     sf = SESSION_DIR / f"{session_id}.jsonl"
+    
+    # Deduplication: skip if last line has same role and content
+    if sf.exists():
+        try:
+            last_line = sf.read_text().strip().splitlines()[-1]
+            last_msg = json.loads(last_line)
+            if last_msg.get("role") == msg.get("role") and last_msg.get("content") == msg.get("content"):
+                return
+        except (json.JSONDecodeError, IndexError, OSError):
+            pass  # If we can't read last line, just append
+    
     sf.open("a").write(json.dumps(msg, ensure_ascii=False) + "\n")
 
 
@@ -282,7 +364,11 @@ async def list_sessions():
 @router.get("/{session_id}")
 async def get_session_messages(session_id: str):
     """Get all messages in a session."""
-    messages = _load_session_messages(session_id)
+    try:
+        messages = _load_session_messages(session_id)
+    except FileNotFoundError:
+        # Session not found in any format — return empty
+        messages = []
     return {
         "id": session_id,
         "title": _session_title_from_messages(messages) or f"Session {session_id[:12]}",
@@ -292,11 +378,13 @@ async def get_session_messages(session_id: str):
 
 @router.post("")
 async def create_session():
-    """Create a new empty session (JSONL format)."""
+    """Create a new empty session (JSONL format) with api_server platform."""
     sid = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
     SESSION_DIR.mkdir(parents=True, exist_ok=True)
     sf = SESSION_DIR / f"{sid}.jsonl"
-    sf.write_text("")
+    # Write a metadata line so the session is listed under 'api_server' platform
+    metadata = {"role": "system", "content": "", "platform": "api_server", "timestamp": datetime.now().isoformat()}
+    sf.write_text(json.dumps(metadata, ensure_ascii=False) + "\n")
     return {"id": sid, "title": f"Session {sid}"}
 
 
@@ -316,22 +404,53 @@ async def rename_session(session_id: str, body: RenameRequest):
     return {"ok": True, "title": body.title}
 
 
+def _delete_session_from_db(session_id: str) -> bool:
+    """Delete a session from SessionDB (state.db). Returns True if deleted."""
+    try:
+        import sqlite3
+        db_path = Path.home() / ".hermes" / "state.db"
+        if not db_path.exists():
+            return False
+        conn = sqlite3.connect(str(db_path))
+        try:
+            cur = conn.execute("SELECT id FROM sessions WHERE id = ?", (session_id,))
+            if cur.fetchone() is None:
+                return False
+            conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+            conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+    except Exception:
+        return False
+
+
 @router.delete("/{session_id}")
 async def delete_session(session_id: str):
-    """Delete a session (tries both formats)."""
-    for ext in (".jsonl", ".json"):
-        sf = SESSION_DIR / f"{session_id}{ext}"
-        if sf.exists():
-            sf.unlink()
-            return {"ok": True}
-    raise HTTPException(404, "Session not found")
+    """Delete a session from both filesystem and SessionDB."""
+    deleted = False
+    # Delete filesystem files — try both with and without "session_" prefix
+    for prefix in ("", "session_"):
+        for ext in (".jsonl", ".json"):
+            sf = SESSION_DIR / f"{prefix}{session_id}{ext}"
+            if sf.exists():
+                sf.unlink()
+                deleted = True
+    # Also delete from SessionDB (sessions can exist in both)
+    if _delete_session_from_db(session_id):
+        deleted = True
+    if deleted:
+        return {"ok": True}
+    raise HTTPException(404, f"Session not found: {session_id}")
 
 
 @router.post("/{session_id}/chat")
 async def chat_in_session(session_id: str, body: ChatRequest):
     """
-    Send a message in a session and stream the response via the Hermes API server.
-    Transforms OpenAI SSE format to the frontend's expected {token: ...} format.
+    Send a message in a session and stream the response.
+    The stream runs in a background task that survives client disconnects.
+    Frontend can reconnect via GET /{session_id}/stream if the page is refreshed.
     """
     # Validate session exists
     found = False
@@ -339,6 +458,10 @@ async def chat_in_session(session_id: str, body: ChatRequest):
         if (SESSION_DIR / f"{session_id}{ext}").exists():
             found = True
             break
+    if not found:
+        # Also check DB
+        if _load_session_from_db(session_id):
+            found = True
     if not found:
         raise HTTPException(404, "Session not found")
 
@@ -355,6 +478,9 @@ async def chat_in_session(session_id: str, body: ChatRequest):
                 messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": body.message})
 
+    # Save user message to session file
+    _save_message(session_id, {"role": "user", "content": body.message})
+
     # Build the API server payload
     payload = {
         "model": body.model or "hermes-agent",
@@ -362,18 +488,20 @@ async def chat_in_session(session_id: str, body: ChatRequest):
         "stream": True,
     }
 
-    async def event_generator():
-        # Save user message to session file
-        _save_message(session_id, {"role": "user", "content": body.message})
+    # Create stream state (cancels any previous stream for this session)
+    state = active_streams.create(session_id)
 
-        accumulated_response = ""
+    async def background_stream():
+        """Run the API server stream in the background, appending to all_tokens and signaling consumers."""
+        accumulated = ""
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(300.0)) as client:
+                headers = {"Content-Type": "application/json"}
+                headers["X-Hermes-Session-Id"] = session_id
+                api_key = _get_api_server_key()
+                if api_key:
+                    headers["Authorization"] = f"Bearer {api_key}"
 
-        async with httpx.AsyncClient(timeout=httpx.Timeout(300.0)) as client:
-            headers = {"Content-Type": "application/json"}
-            # Pass session ID so API server maintains conversation context
-            headers["X-Hermes-Session-Id"] = session_id
-
-            try:
                 async with client.stream(
                     "POST",
                     f"{API_SERVER_URL}/v1/chat/completions",
@@ -382,21 +510,30 @@ async def chat_in_session(session_id: str, body: ChatRequest):
                 ) as response:
                     if response.status_code != 200:
                         error_text = await response.aread()
-                        yield f"data: {json.dumps({'error': f'HTTP {response.status_code}: {error_text.decode()}'})}\n\n"
-                        yield f"data: {json.dumps({'done': True})}\n\n"
+                        err = f"HTTP {response.status_code}: {error_text.decode()}"
+                        state.error = err
+                        state.all_tokens.append(json.dumps({"error": err}))
+                        state.all_tokens.append(json.dumps({"done": True}))
+                        state.done.set()
+                        async with state.new_token:
+                            state.new_token.notify_all()
                         return
 
-                    # Read the SSE stream and transform to frontend format
                     async for line in response.aiter_lines():
                         line = line.strip()
                         if not line.startswith("data: "):
                             continue
                         data_str = line[6:].strip()
                         if data_str == "[DONE]":
-                            # Save assistant response to session file
-                            if accumulated_response:
-                                _save_message(session_id, {"role": "assistant", "content": accumulated_response})
-                            yield f"data: {json.dumps({'done': True})}\n\n"
+                            # Stream completed successfully — save full response
+                            if accumulated:
+                                _save_message(session_id, {"role": "assistant", "content": accumulated})
+                            state.accumulated = accumulated
+                            state.saved = True
+                            state.all_tokens.append(json.dumps({"done": True}))
+                            state.done.set()
+                            async with state.new_token:
+                                state.new_token.notify_all()
                             return
 
                         try:
@@ -404,27 +541,157 @@ async def chat_in_session(session_id: str, body: ChatRequest):
                         except json.JSONDecodeError:
                             continue
 
-                        # OpenAI SSE: choices[0].delta.content
                         choices = data.get("choices", [])
                         if choices:
                             delta = choices[0].get("delta", {})
                             content = delta.get("content")
                             if content:
-                                accumulated_response += content
-                                yield f"data: {json.dumps({'token': content})}\n\n"
+                                accumulated += content
+                                state.accumulated = accumulated
+                                state.all_tokens.append(json.dumps({"token": content}))
+                                async with state.new_token:
+                                    state.new_token.notify_all()
 
-                        # Handle errors in the stream
                         if data.get("error"):
-                            yield f"data: {json.dumps({'error': data['error']})}\n\n"
-            except httpx.TimeoutException:
-                yield f"data: {json.dumps({'error': 'Request timed out after 300 seconds'})}\n\n"
-                yield f"data: {json.dumps({'done': True})}\n\n"
-            except httpx.HTTPError as e:
-                yield f"data: {json.dumps({'error': f'HTTP error: {e}'})}\n\n"
-                yield f"data: {json.dumps({'done': True})}\n\n"
+                            state.all_tokens.append(json.dumps({"error": data["error"]}))
+                            async with state.new_token:
+                                state.new_token.notify_all()
+
+        except httpx.TimeoutException:
+            state.error = "Request timed out after 300 seconds"
+            if accumulated and not state.saved:
+                _save_message(session_id, {"role": "assistant", "content": accumulated, "truncated": True})
+                state.saved = True
+            state.all_tokens.append(json.dumps({"error": "Request timed out after 300 seconds"}))
+            state.all_tokens.append(json.dumps({"done": True}))
+            state.done.set()
+            async with state.new_token:
+                state.new_token.notify_all()
+        except httpx.HTTPError as e:
+            state.error = str(e)
+            if accumulated and not state.saved:
+                _save_message(session_id, {"role": "assistant", "content": accumulated, "truncated": True})
+                state.saved = True
+            state.all_tokens.append(json.dumps({"error": f"HTTP error: {e}"}))
+            state.all_tokens.append(json.dumps({"done": True}))
+            state.done.set()
+            async with state.new_token:
+                state.new_token.notify_all()
+        except asyncio.CancelledError:
+            # Stream was cancelled (e.g., new message sent in same session)
+            if accumulated and not state.saved:
+                _save_message(session_id, {"role": "assistant", "content": accumulated, "truncated": True})
+                state.saved = True
+            state.done.set()
+            async with state.new_token:
+                state.new_token.notify_all()
+            raise
+        except Exception as e:
+            state.error = str(e)
+            if accumulated and not state.saved:
+                _save_message(session_id, {"role": "assistant", "content": accumulated, "truncated": True})
+                state.saved = True
+            state.all_tokens.append(json.dumps({"error": f"Stream error: {e}"}))
+            state.all_tokens.append(json.dumps({"done": True}))
+            state.done.set()
+            async with state.new_token:
+                state.new_token.notify_all()
+        finally:
+            # Safety net: save partial response if not already saved
+            if accumulated and not state.saved:
+                _save_message(session_id, {"role": "assistant", "content": accumulated, "truncated": True})
+                state.saved = True
+            state.done.set()
+            async with state.new_token:
+                state.new_token.notify_all()
+            # Clean up from active store after a delay (allow consumers to drain)
+            await asyncio.sleep(3)
+            active_streams.remove(session_id)
+
+    # Launch the background task
+    state.task = asyncio.create_task(background_stream())
+
+    # Return SSE stream that reads from all_tokens starting at current position
+    async def event_generator():
+        """Yield tokens from all_tokens list, waiting for new ones via Condition."""
+        cursor = len(state.all_tokens)  # Start from current position (skip what was already generated)
+        try:
+            while True:
+                # Yield any new tokens since our cursor
+                while cursor < len(state.all_tokens):
+                    data_json = state.all_tokens[cursor]
+                    cursor += 1
+                    yield f"data: {data_json}\n\n"
+                    data = json.loads(data_json) if isinstance(data_json, str) else data_json
+                    if data.get("done"):
+                        return
+
+                # If stream is done and we've yielded everything, exit
+                if state.done.is_set() and cursor >= len(state.all_tokens):
+                    return
+
+                # Wait for new tokens
+                async with state.new_token:
+                    try:
+                        await asyncio.wait_for(state.new_token.wait(), timeout=2.0)
+                    except asyncio.TimeoutError:
+                        pass
+        except (GeneratorExit, asyncio.CancelledError):
+            # Client disconnected — background task keeps running
+            pass
 
     return StreamingResponse(
         event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/{session_id}/stream")
+async def reconnect_stream(session_id: str):
+    """
+    Reconnect to an active stream for a session.
+    If a stream is in progress, replays accumulated text then continues with live tokens.
+    If no stream is active, returns immediately with status info.
+    """
+    state = active_streams.get(session_id)
+
+    if not state or state.done.is_set():
+        # No active stream
+        return {"status": "idle", "session_id": session_id}
+
+    async def reconnect_generator():
+        """Replay accumulated text then continue with live tokens."""
+        # First, send all accumulated text as a single reconnect event
+        if state.accumulated:
+            yield f"data: {json.dumps({'reconnect': True, 'text': state.accumulated})}\n\n"
+
+        # Start cursor after current tokens (we've already sent accumulated text)
+        cursor = len(state.all_tokens)
+
+        while True:
+            # Yield any new tokens
+            while cursor < len(state.all_tokens):
+                data_json = state.all_tokens[cursor]
+                cursor += 1
+                yield f"data: {data_json}\n\n"
+                data = json.loads(data_json) if isinstance(data_json, str) else data_json
+                if data.get("done"):
+                    return
+
+            # If stream is done and we've yielded everything, exit
+            if state.done.is_set() and cursor >= len(state.all_tokens):
+                return
+
+            # Wait for new tokens
+            async with state.new_token:
+                try:
+                    await asyncio.wait_for(state.new_token.wait(), timeout=2.0)
+                except asyncio.TimeoutError:
+                    pass
+
+    return StreamingResponse(
+        reconnect_generator(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

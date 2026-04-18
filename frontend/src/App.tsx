@@ -15,6 +15,7 @@ import Files from './pages/Files'
 import Jobs from './pages/Jobs'
 import Config from './pages/Config'
 import Kanban from './pages/Kanban'
+import Conversations from './pages/Conversations'
 
 export default function App() {
   return (
@@ -23,6 +24,9 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="/sessions" element={<Sessions />} />
         <Route path="/sessions/:id" element={<Chat />} />
+        <Route path="/conversations" element={<Conversations />} />
+        <Route path="/conversations/:channelId" element={<Conversations />} />
+        <Route path="/conversations/:channelId/:sessionId" element={<Conversations />} />
         <Route path="/skills" element={<Skills />} />
         <Route path="/memory" element={<Memory />} />
         <Route path="/crons" element={<Crons />} />

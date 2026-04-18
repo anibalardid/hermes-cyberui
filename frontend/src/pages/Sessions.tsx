@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { sessionsApi } from '../lib/api'
-import { Plus, Trash2, MessageSquare, Search } from 'lucide-react'
+import { Trash2, MessageSquare, Search } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 const PLATFORM_STYLES: Record<string, { color: string; bg: string; label: string }> = {
@@ -38,13 +38,6 @@ export default function Sessions() {
     queryFn: sessionsApi.list,
   })
 
-  const createMutation = useMutation({
-    mutationFn: () => sessionsApi.create(),
-    onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: ['sessions'] })
-      window.location.href = `/sessions/${res.id}`
-    },
-  })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => sessionsApi.delete(id),
@@ -68,14 +61,6 @@ export default function Sessions() {
             <p>{sessions.length} total session{sessions.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
-        <button
-          className="btn btn-primary"
-          onClick={() => createMutation.mutate()}
-          disabled={createMutation.isPending}
-        >
-          <Plus size={14} />
-          New Session
-        </button>
       </div>
 
       {/* Search */}

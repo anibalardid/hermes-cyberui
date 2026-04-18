@@ -263,7 +263,7 @@ export default function Crons() {
       {/* Toast notification */}
       {toast && (
         <div style={{
-          position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 9999,
+          position: 'fixed', top: '1.5rem', right: '1.5rem', zIndex: 9999,
           display: 'flex', alignItems: 'center', gap: '0.5rem',
           padding: '0.75rem 1rem', borderRadius: '0.5rem',
           background: toast.ok ? 'rgba(0,255,65,0.12)' : 'rgba(255,68,68,0.12)',

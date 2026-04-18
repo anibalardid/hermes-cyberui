@@ -1786,7 +1786,7 @@ export default function Kanban() {
         <div
           onClick={() => setToast(null)}
           style={{
-            position: 'fixed', bottom: '1.5rem', right: '1.5rem',
+            position: 'fixed', top: '1.5rem', right: '1.5rem',
             padding: '0.6rem 1rem',
             background: toast.ok ? 'var(--primary)' : 'var(--pink)',
             color: toast.ok ? 'var(--bg)' : 'white',

@@ -139,6 +139,7 @@ export interface Message {
   content: string
   title?: string
   model?: string
+  truncated?: boolean
 }
 
 export interface Skill {
@@ -353,7 +354,7 @@ export interface Task {
   id: string
   title: string
   description: string
-  status: 'backlog' | 'todo' | 'in_progress' | 'done'
+  status: 'backlog' | 'todo' | 'in_progress' | 'done' | 'failed'
   priority: 'low' | 'medium' | 'high' | 'critical'
   tags: string[]
   profile: string

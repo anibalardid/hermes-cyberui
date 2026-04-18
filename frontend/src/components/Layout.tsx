@@ -4,12 +4,13 @@ import { useAppStore } from '../stores/appStore'
 import {
   LayoutDashboard, MessageSquare, Brain, Database,
   Settings, ChevronLeft, ChevronRight, Terminal,
-  Clock, Puzzle, FileText, UserCircle, Bot, Eye, FolderOpen, Menu, X, Activity, UserCheck, Kanban
+  Clock, Puzzle, FileText, UserCircle, Bot, Eye, FolderOpen, Menu, X, Activity, UserCheck, Kanban, MessagesSquare
 } from 'lucide-react'
 
 const NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/sessions', icon: MessageSquare, label: 'Sessions' },
+  { to: '/conversations', icon: MessagesSquare, label: 'Conversations' },
   { to: '/skills', icon: Brain, label: 'Skills' },
   { to: '/memory', icon: Database, label: 'Memory' },
   { to: '/crons', icon: Clock, label: 'Crons' },
