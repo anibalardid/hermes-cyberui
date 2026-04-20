@@ -8,7 +8,7 @@ import DOMPurify from 'dompurify'
 import {
   MessageCircle, Hash, Send, Terminal,
   User, Bot, Wrench, Loader2, Search, Trash2, PlusCircle, StopCircle, AlertTriangle,
-  PanelRightClose, Eye, Zap, FileText, Activity
+  PanelRightClose, Eye, Zap, FileText, Activity, EyeOff
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -263,16 +263,9 @@ function ActivitySidebar({ messages, streaming, streamText }: { messages: Messag
     return { icon: Wrench, label: 'Tool Call', color: '#d400ff' }
   }
 
-  // Truncate content for display
-  function truncateContent(content: string, maxLen: number = 180): string {
+  // Render content — no truncation, full text with scroll for long entries
+  function renderContent(content: string): string {
     if (!content) return '(empty)'
-    const lines = content.split('\n')
-    if (lines.length > 5) {
-      return lines.slice(0, 5).join('\n') + `\n... (+${lines.length - 5} more lines)`
-    }
-    if (content.length > maxLen) {
-      return content.slice(0, maxLen) + '...'
-    }
     return content
   }
 
@@ -328,12 +321,12 @@ function ActivitySidebar({ messages, streaming, streamText }: { messages: Messag
                 overflowWrap: 'break-word',
                 fontSize: '0.72rem',
                 lineHeight: 1.45,
-                maxHeight: '200px',
+                maxHeight: '500px',
                 overflowY: 'auto',
               }}
-              {...(msg.role === 'assistant' ? { dangerouslySetInnerHTML: { __html: renderMarkdown(truncateContent(content, 300)) } } : {})}
+              {...(msg.role === 'assistant' ? { dangerouslySetInnerHTML: { __html: renderMarkdown(renderContent(content)) } } : {})}
             >
-              {msg.role !== 'assistant' ? truncateContent(content, 250) : null}
+              {msg.role !== 'assistant' ? renderContent(content) : null}
             </div>
           </div>
         )
@@ -356,8 +349,8 @@ function ActivitySidebar({ messages, streaming, streamText }: { messages: Messag
           {streamText && (
             <div
               className="response-markdown"
-              style={{ color: '#c0f0c0', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '100px', overflowY: 'auto' }}
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(truncateContent(streamText, 300)) }}
+              style={{ color: '#c0f0c0', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '400px', overflowY: 'auto' }}
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(renderContent(streamText)) }}
             />
           )}
           {!streamText && (
@@ -585,6 +578,9 @@ function ChatView({ session, onDelete, onMessageSent }: { session: ConversationG
   }
 
   const messages = data?.messages || []
+
+  // Only allow sending messages on api_server/web sessions — others are read-only mirrors
+  const isReadOnly = session?.platform ? !['api_server', 'web'].includes(session.platform.toLowerCase()) : false
 
   // When pendingUserMsg is set, we optimistically show the user's message.
   // If the server data also includes that same user message (race condition),
@@ -870,6 +866,19 @@ function ChatView({ session, onDelete, onMessageSent }: { session: ConversationG
         </div>
       )}
     </div>
+      {/* Input area — read-only for non-web/api sessions */}
+      {isReadOnly ? (
+        <div style={{
+          padding: '0.75rem', borderTop: '1px solid var(--border)', flexShrink: 0,
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
+          background: 'rgba(255,176,0,0.04)',
+        }}>
+          <EyeOff size={14} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+          <span style={{ color: 'var(--muted)', fontSize: '0.78rem', fontStyle: 'italic' }}>
+            Read-only — this is a {session?.platform} conversation, messages can only be sent from {session?.platform === 'cli' ? 'the terminal' : session?.platform}.
+          </span>
+        </div>
+      ) : (
       <div style={{
         padding: '0.75rem', borderTop: '1px solid var(--border)', flexShrink: 0,
         display: 'flex', gap: '0.5rem', alignItems: 'flex-end',
@@ -921,6 +930,7 @@ function ChatView({ session, onDelete, onMessageSent }: { session: ConversationG
           </button>
         )}
       </div>
+      )}
       {/* Toast notification */}
       {toast && (
         <div
