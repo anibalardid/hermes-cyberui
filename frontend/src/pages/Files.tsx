@@ -14,7 +14,7 @@ function formatSize(bytes: number): string {
 }
 
 function formatDate(ts: number): string {
-  return new Date(ts * 1000).toLocaleString('es-AR', {
+  return new Date(ts * 1000).toLocaleString('en-US', {
     month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit'
   })
 }
@@ -88,7 +88,7 @@ function FileViewerModal({ path, content, onClose, onEdit, isEditing, editConten
         <span style={{ fontSize: '0.8rem', color: '#05d9e8', fontFamily: 'JetBrains Mono, monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{path}</span>
         {!isEditing && (
           <button onClick={onEdit} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '0.375rem', fontSize: '0.75rem', background: 'rgba(245,212,0,0.1)', border: '1px solid rgba(245,212,0,0.4)', cursor: 'pointer', color: '#f5d400', flexShrink: 0 }}>
-            <Edit3 size={12} />Editar
+            <Edit3 size={12} />Edit
           </button>
         )}
       </div>
@@ -99,8 +99,8 @@ function FileViewerModal({ path, content, onClose, onEdit, isEditing, editConten
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
               <Edit3 size={12} style={{ color: '#f5d400' }} />
               <span style={{ fontSize: '0.7rem', color: 'var(--muted)', flex: 1 }}>Editing</span>
-              {saveStatus === 'saved' && <span style={{ fontSize: '0.75rem', color: '#00ff41' }}>Guardado</span>}
-              {saveStatus === 'error' && <span style={{ fontSize: '0.75rem', color: '#ff4444' }}>Error al guardar</span>}
+              {saveStatus === 'saved' && <span style={{ fontSize: '0.75rem', color: '#00ff41' }}>Saved</span>}
+              {saveStatus === 'error' && <span style={{ fontSize: '0.75rem', color: '#ff4444' }}>Error saving</span>}
             </div>
             <textarea
               value={editContent}
@@ -115,10 +115,10 @@ function FileViewerModal({ path, content, onClose, onEdit, isEditing, editConten
             />
             <div style={{ display: 'flex', gap: '0.5rem', padding: '0.75rem', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
               <button onClick={onCancelEdit} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '0.5rem', borderRadius: '0.375rem', fontSize: '0.8rem', background: 'transparent', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--muted)' }}>
-                <X size={14} />Cancelar
+                <X size={14} />Cancel
               </button>
               <button onClick={onSave} disabled={writePending} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '0.5rem', borderRadius: '0.375rem', fontSize: '0.8rem', background: '#00ff41', border: '1px solid #00ff41', cursor: 'pointer', color: '#000' }}>
-                <Save size={14} />{writePending ? 'Guardando...' : 'Guardar'}
+                <Save size={14} />{writePending ? 'Saving...' : 'Save'}
               </button>
             </div>
           </>
@@ -284,7 +284,7 @@ export default function Files() {
           ) : data?.error ? (
             <div style={{ padding: '1rem', color: '#ff4444', fontSize: '0.875rem' }}>{data.error}</div>
           ) : data?.entries.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Directorio vacio</div>
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Empty directory</div>
           ) : (
             <div>
               {/* Column headers — hidden on mobile */}
@@ -323,17 +323,17 @@ export default function Files() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
                   <Edit3 size={14} style={{ color: '#f5d400' }} />
                   <span style={{ fontSize: '0.8rem', color: '#f5d400', fontFamily: 'JetBrains Mono, monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingFile}</span>
-                  {saveStatus === 'saved' && <span style={{ fontSize: '0.75rem', color: '#00ff41' }}>Guardado</span>}
-                  {saveStatus === 'error' && <span style={{ fontSize: '0.75rem', color: '#ff4444' }}>Error al guardar</span>}
+                  {saveStatus === 'saved' && <span style={{ fontSize: '0.75rem', color: '#00ff41' }}>Saved</span>}
+                  {saveStatus === 'error' && <span style={{ fontSize: '0.75rem', color: '#ff4444' }}>Error saving</span>}
                   <button onClick={cancelEdit} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '0.375rem', fontSize: '0.75rem', background: 'transparent', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--muted)' }}>
-                    <X size={12} />Cancelar
+                    <X size={12} />Cancel
                   </button>
                   <button
                     onClick={saveEdit}
                     disabled={writeMutation.isPending}
                     style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '0.375rem', fontSize: '0.75rem', background: '#00ff41', border: '1px solid #00ff41', cursor: 'pointer', color: '#000' }}
                   >
-                    <Save size={12} />{writeMutation.isPending ? 'Guardando...' : 'Guardar'}
+                    <Save size={12} />{writeMutation.isPending ? 'Saving...' : 'Save'}
                   </button>
                 </div>
                 <textarea
@@ -354,13 +354,13 @@ export default function Files() {
                   <Eye size={14} style={{ color: '#05d9e8' }} />
                   <span style={{ fontSize: '0.8rem', color: '#05d9e8', fontFamily: 'JetBrains Mono, monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{viewingFile}</span>
                   <button onClick={closeViewer} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '0.375rem', fontSize: '0.75rem', background: 'transparent', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--muted)' }}>
-                    <X size={12} />Cerrar
+                    <X size={12} />Close
                   </button>
                   <button
                     onClick={startEdit}
                     style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '0.375rem', fontSize: '0.75rem', background: 'rgba(245,212,0,0.1)', border: '1px solid rgba(245,212,0,0.4)', cursor: 'pointer', color: '#f5d400' }}
                   >
-                    <Edit3 size={12} />Editar
+                    <Edit3 size={12} />Edit
                   </button>
                 </div>
                 <div style={{ flex: 1, overflow: 'auto', padding: '1rem' }}>

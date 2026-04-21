@@ -252,7 +252,7 @@ export default function Dashboard() {
                   <td style={{ color: '#00ff41', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.title || `Session ${s.id}`}</td>
                   <td><PlatformBadge platform={s.platform} /></td>
                   <td style={{ color: 'var(--muted)' }}>{s.message_count}</td>
-                  <td style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>{new Date(s.updated).toLocaleDateString('es-AR')}</td>
+                  <td style={{ color: 'var(--muted)', whiteSpace: 'nowrap' }}>{new Date(s.updated).toLocaleDateString('en-US')}</td>
                 </tr>
               ))}
             </tbody>

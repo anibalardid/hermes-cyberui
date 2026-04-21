@@ -89,7 +89,7 @@ function SessionCard({ session }: { session: SessionInfo }) {
         <div className="px-4 py-3 border-t space-y-1" style={{ borderColor: 'var(--border)' }}>
           <div className="grid grid-cols-2 gap-2 text-[11px]">
             <StatRow label="ID" value={session.id.slice(0, 12) + '…'} mono />
-            <StatRow label="Started" value={new Date(session.started_at).toLocaleString('es-AR')} />
+            <StatRow label="Started" value={new Date(session.started_at).toLocaleString('en-US')} />
             <StatRow label="Messages" value={session.message_count} />
             <StatRow label="Tool calls" value={session.tool_call_count} />
             <StatRow label="Input tokens" value={session.input_tokens.toLocaleString()} />
@@ -99,7 +99,7 @@ function SessionCard({ session }: { session: SessionInfo }) {
           </div>
           {session.ended_at && (
             <p className="text-[10px] mt-2" style={{ color: 'var(--muted)' }}>
-              Ended: {new Date(session.ended_at).toLocaleString('es-AR')}
+              Ended: {new Date(session.ended_at).toLocaleString('en-US')}
             </p>
           )}
         </div>
@@ -147,7 +147,7 @@ function JobCard({ job }: { job: JobInfo }) {
           <p className="text-[10px]" style={{ color: 'var(--muted)' }}>{timeAgo(job.last_run_at)}</p>
           {job.next_run_at && job.state !== 'paused' && (
             <p className="text-[9px]" style={{ color: 'var(--muted)' }}>
-              {new Date(job.next_run_at).toLocaleString('es-AR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}
+              {new Date(job.next_run_at).toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}
             </p>
           )}
         </div>
@@ -161,7 +161,7 @@ function JobCard({ job }: { job: JobInfo }) {
             <StatRow label="Enabled" value={job.enabled ? 'Yes' : 'No'} />
             <StatRow label="Last status" value={job.last_status || '—'} />
             <StatRow label="Last run" value={job.last_run_at ? timeAgo(job.last_run_at) : '—'} />
-            <StatRow label="Next run" value={job.next_run_at ? new Date(job.next_run_at).toLocaleString('es-AR') : '—'} />
+            <StatRow label="Next run" value={job.next_run_at ? new Date(job.next_run_at).toLocaleString('en-US') : '—'} />
             {job.deliver && <StatRow label="Deliver" value={job.deliver} />}
             {job.model && <StatRow label="Model" value={job.model} />}
           </div>

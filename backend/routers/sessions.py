@@ -193,13 +193,17 @@ def _list_sessions_from_db() -> list[dict]:
         db = SessionDB()
         conn = db._conn
         cur = conn.execute(
-            "SELECT id, source, model, message_count, title, started_at FROM sessions ORDER BY started_at DESC"
+            "SELECT id, source, model, message_count, title, started_at, parent_session_id FROM sessions ORDER BY started_at DESC"
         )
         sessions = []
         for row in cur.fetchall():
-            sid, source, model, msg_count, title, started_at = row
+            sid, source, model, msg_count, title, started_at, parent_sid = row
             # Skip cron/one-off sessions
             if sid.startswith("session_cron_"):
+                continue
+            # Skip subagent sessions — they are child sessions of delegate_task
+            # and appear as duplicate conversations in the UI
+            if parent_sid:
                 continue
             # Format timestamp
             try:
@@ -231,8 +235,30 @@ def _list_sessions_from_db() -> list[dict]:
 
 # ── List sessions (both sources, merged, sorted by mtime) ────────────────────
 
+def _get_subagent_session_ids() -> set[str]:
+    """Return set of session IDs that are subagent children (have parent_session_id set)."""
+    try:
+        import sqlite3
+        db_path = Path.home() / ".hermes" / "state.db"
+        if not db_path.exists():
+            return set()
+        conn = sqlite3.connect(str(db_path))
+        try:
+            cur = conn.execute(
+                "SELECT id FROM sessions WHERE parent_session_id IS NOT NULL AND parent_session_id != ''"
+            )
+            return {row[0] for row in cur.fetchall()}
+        finally:
+            conn.close()
+    except Exception:
+        return set()
+
+
 def _list_sessions() -> list[dict]:
     SESSION_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Get IDs of subagent sessions (will be filtered from file-based listing too)
+    subagent_ids = _get_subagent_session_ids()
 
     # Collect IDs already covered by DB (to avoid duplicating from JSONL)
     db_sessions = _list_sessions_from_db()
@@ -261,6 +287,10 @@ def _list_sessions() -> list[dict]:
 
         # Skip if already in DB
         if normalized_sid in db_ids:
+            continue
+
+        # Skip subagent sessions from file listing too
+        if normalized_sid in subagent_ids:
             continue
 
         # Get file timestamps

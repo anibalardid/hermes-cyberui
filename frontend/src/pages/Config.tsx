@@ -9,18 +9,18 @@ import {
 import { configApi } from '../lib/api'
 
 const SECTION_META: Record<string, { label: string; icon: React.ReactNode; description: string }> = {
-  model:       { label: 'Model',       icon: <Cpu size={13} />,       description: 'Modelo y provider por defecto' },
-  display:     { label: 'Display',     icon: <Palette size={13} />,   description: 'Preferencias de UI y personalidad' },
-  terminal:    { label: 'Terminal',    icon: <Terminal size={13} />,  description: 'Shell backend y timeouts' },
-  tts:         { label: 'TTS',        icon: <Volume2 size={13} />,   description: 'Configuracion text-to-speech' },
-  stt:         { label: 'STT',        icon: <Mic size={13} />,       description: 'Configuracion speech-to-text' },
-  memory:      { label: 'Memory',     icon: <Brain size={13} />,     description: 'Configuracion de memoria y perfil' },
-  browser:     { label: 'Browser',    icon: <Globe size={13} />,     description: 'Configuracion de browser automation' },
+  model:       { label: 'Model',       icon: <Cpu size={13} />,       description: 'Default model and provider' },
+  display:     { label: 'Display',     icon: <Palette size={13} />,   description: 'UI preferences and personality' },
+  terminal:    { label: 'Terminal',    icon: <Terminal size={13} />,  description: 'Shell backend and timeouts' },
+  tts:         { label: 'TTS',        icon: <Volume2 size={13} />,   description: 'Text-to-speech configuration' },
+  stt:         { label: 'STT',        icon: <Mic size={13} />,       description: 'Speech-to-text configuration' },
+  memory:      { label: 'Memory',     icon: <Brain size={13} />,     description: 'Memory and profile configuration' },
+  browser:     { label: 'Browser',    icon: <Globe size={13} />,     description: 'Browser automation configuration' },
   mcp_servers: { label: 'MCP Servers',icon: <Plug size={13} />,      description: 'Model Context Protocol servers' },
-  delegation:  { label: 'Delegation', icon: <Users size={13} />,     description: 'Configuracion de subagentes' },
-  compression: { label: 'Compression',icon: <Shrink size={13} />,   description: 'Configuracion de compresion de contexto' },
-  cron:        { label: 'Cron',       icon: <Zap size={13} />,       description: 'Configuracion de jobs programados' },
-  security:    { label: 'Security',   icon: <Lock size={13} />,      description: 'Seguridad y redaction' },
+  delegation:  { label: 'Delegation', icon: <Users size={13} />,     description: 'Sub-agent configuration' },
+  compression: { label: 'Compression',icon: <Shrink size={13} />,   description: 'Context compression configuration' },
+  cron:        { label: 'Cron',       icon: <Zap size={13} />,       description: 'Scheduled jobs configuration' },
+  security:    { label: 'Security',   icon: <Lock size={13} />,      description: 'Security and redaction' },
 }
 
 function renderValue(value: unknown, depth = 0): React.ReactNode {
@@ -147,7 +147,7 @@ export default function ConfigPage() {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <AlertTriangle size={32} style={{ color: 'var(--pink)' }} className="mx-auto mb-2" />
-          <p style={{ color: 'var(--txt)' }}>No se pudo cargar la configuracion</p>
+          <p style={{ color: 'var(--txt)' }}>Failed to load configuration</p>
           <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{String(error)}</p>
         </div>
       </div>
@@ -164,7 +164,7 @@ export default function ConfigPage() {
           Config
         </h1>
         <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-          Configuracion de Hermes — secrets redactados automaticamente
+          Hermes configuration — secrets automatically redacted
           {data.configVersion && (
             <span> · v{data.configVersion}</span>
           )}

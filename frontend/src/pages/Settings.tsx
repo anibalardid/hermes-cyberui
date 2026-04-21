@@ -233,7 +233,7 @@ export default function Settings() {
               <span style={{ color: '#00ff41', fontFamily: 'Orbitron, sans-serif' }}>Hermes CyberUI</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-              <span style={{ color: 'var(--muted)' }}>Version</span>
+              <span style={{ color: 'var(--muted)' }}>About</span>
               <span style={{ color: 'var(--txt)', fontFamily: 'JetBrains Mono, monospace' }}>1.0.0</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>

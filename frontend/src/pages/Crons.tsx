@@ -46,7 +46,7 @@ export default function Crons() {
     if (!iso) return '—'
     try {
       const d = new Date(iso)
-      return d.toLocaleString('es-AR', {
+      return d.toLocaleString('en-US', {
         day: '2-digit', month: '2-digit',
         hour: '2-digit', minute: '2-digit', timeZoneName: 'short'
       })
@@ -252,7 +252,7 @@ export default function Crons() {
               <div>
                 <p style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 0.5rem' }}>Prompt</p>
                 <pre style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '0.375rem', padding: '0.75rem', fontSize: '0.8rem', color: 'var(--txt)', overflowX: 'auto', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {(jobDetail?.prompt ?? viewingJob.prompt ?? '').trim() || 'Sin prompt configurado.'}
+                  {(jobDetail?.prompt ?? viewingJob.prompt ?? '').trim() || 'No prompt configured.'}
                 </pre>
               </div>
             </div>

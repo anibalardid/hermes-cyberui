@@ -57,7 +57,7 @@ function getDueDateInfo(dueDate: string | null) {
   if (diff === 1) return { label: 'Tomorrow', color: 'var(--accent)', overdue: false, today: false }
   if (diff <= 7) return { label: `${diff}d`, color: 'var(--accent)', overdue: false, today: false }
   return {
-    label: new Date(dueDate).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }),
+    label: new Date(dueDate).toLocaleDateString('en-US', { day: '2-digit', month: 'short' }),
     color: 'var(--muted)',
     overdue: false,
     today: false,
@@ -584,7 +584,7 @@ function TaskModal({
                           </span>
                         )}
                         <span style={{ fontSize: '0.6rem', color: 'rgba(224,224,224,0.7)', marginLeft: 'auto' }}>
-                          {new Date(h.timestamp).toLocaleString('es-AR', {
+                          {new Date(h.timestamp).toLocaleString('en-US', {
                             day: '2-digit', month: '2-digit',
                             hour: '2-digit', minute: '2-digit',
                           })}
@@ -761,7 +761,7 @@ function HistoryModal({ task, onClose }: { task: Task; onClose: () => void }) {
                     {h.action === 'completed' ? '✓ ' : ''}{h.action}
                   </span>
                   <span style={{ fontSize: '0.7rem', color: 'rgba(224,224,224,0.8)' }}>
-                    {new Date(h.timestamp).toLocaleString('es-AR', {
+                    {new Date(h.timestamp).toLocaleString('en-US', {
                       day: '2-digit', month: '2-digit', year: '2-digit',
                       hour: '2-digit', minute: '2-digit',
                     })}
@@ -941,7 +941,7 @@ function ResponseModal({ task, onClose }: { task: Task; onClose: () => void }) {
                       {h.action === 'completed' ? '✓ ' : ''}{h.action}
                     </span>
                     <span style={{ fontSize: '0.7rem', color: 'rgba(224,224,224,0.8)' }}>
-                      {new Date(h.timestamp).toLocaleString('es-AR', {
+                      {new Date(h.timestamp).toLocaleString('en-US', {
                         day: '2-digit', month: '2-digit', year: '2-digit',
                         hour: '2-digit', minute: '2-digit',
                       })}

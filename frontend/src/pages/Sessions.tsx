@@ -119,7 +119,7 @@ export default function Sessions() {
                     <PlatformBadge platform={s.platform} />
                   </div>
                   <p className="text-xs text-muted" style={{ margin: '2px 0 0' }}>
-                    {s.message_count} msg{s.message_count !== 1 ? 's' : ''} — {new Date(s.updated).toLocaleDateString('es-AR')}
+                    {s.message_count} msg{s.message_count !== 1 ? 's' : ''} — {new Date(s.updated).toLocaleDateString('en-US')}
                   </p>
                 </div>
               </Link>

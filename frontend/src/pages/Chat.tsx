@@ -233,7 +233,7 @@ export default function Chat() {
             <>
               {chatMessages.map((msg: any, i: number) => {
                 const ts = msg._ts ? new Date(msg._ts) : null
-                const timeStr = ts ? ts.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : null
+                const timeStr = ts ? ts.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : null
                 return (
                 <div key={i} className="space-y-1">
                   <div
@@ -389,7 +389,7 @@ export default function Chat() {
             {normalizedMessages.map((msg: any, i: number) => {
               const isTool = msg.role === 'tool' || !!msg.tool_calls
               const ts = msg._ts ? new Date(msg._ts) : null
-              const timeStr = ts ? ts.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : null
+              const timeStr = ts ? ts.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : null
               let displayContent: string
               if (isTool) {
                 if (msg.tool_calls) {
