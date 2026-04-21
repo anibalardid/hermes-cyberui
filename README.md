@@ -39,12 +39,12 @@ The UI features a dark neon aesthetic with 8 color schemes (Matrix Green, Cyber 
 | **Sessions** | **Multi-Agent** | **Memory** |
 | ![Settings](docs/screenshots/settings.png) | ![Crons](docs/screenshots/crons.png) | ![Logs](docs/screenshots/logs.png) |
 | **Settings** | **Cron Jobs** | **Logs** |
-|| ![Skills](docs/screenshots/skills.png) | ![Profiles](docs/screenshots/profiles.png) | ![Plugins](docs/screenshots/plugins.png) |
-|| **Skills** | **Profiles** | **Plugins** |
-|| ![Files](docs/screenshots/files.png) | ![Config](docs/screenshots/config.png) | ![Jobs](docs/screenshots/jobs.png) |
-|| **Files** | **Config** | **Jobs** |
-|| ![Chat](docs/screenshots/chat.png) | ![Conversations](docs/screenshots/conversations.png) | |
-|| **Chat** | **Conversations** | |
+| ![Skills](docs/screenshots/skills.png) | ![Profiles](docs/screenshots/profiles.png) | ![Plugins](docs/screenshots/plugins.png) |
+| **Skills** | **Profiles** | **Plugins** |
+| ![Files](docs/screenshots/files.png) | ![Config](docs/screenshots/config.png) | ![Jobs](docs/screenshots/jobs.png) |
+| **Files** | **Config** | **Jobs** |
+| ![Chat](docs/screenshots/chat.png) | ![Conversations](docs/screenshots/conversations.png) | |
+| **Chat** | **Conversations** | |
 
 ## Architecture
 
