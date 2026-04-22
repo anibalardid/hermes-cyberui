@@ -134,6 +134,9 @@ body{height:100%;margin:0;padding:0;overflow:hidden;font-family:'JetBrains Mono'
 /* ── Animations ───────────────────────── */
 @keyframes pulse-glow{0%,100%{opacity:1}50%{opacity:0.5}}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(0.8);opacity:0.4}}
+@keyframes cursor-blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes spinner{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 .animate-pulse-glow{animation:pulse-glow 2s ease-in-out infinite}
 .animate-blink{animation:blink 1s step-end infinite}
 .animate-spin{animation:spin 1s linear infinite}

@@ -29,6 +29,9 @@ Thumbs.db
 *.swo
 *~
 
+# Hermes agent context files (local only)
+.hermes.md
+
 # Editor
 .vscode/
 .idea/
@@ -39,3 +42,9 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Backups
+*.backup
+*.backup.*
+*.bak
+*.orig

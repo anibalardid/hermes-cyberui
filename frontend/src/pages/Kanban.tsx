@@ -6,8 +6,11 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import {
   Plus, X, GripVertical, Clock, User,
-  ChevronDown, Archive, Play, Edit3, MessageSquare, ArrowRight,
-  Trash2, RotateCcw, Search, SlidersHorizontal, FileText, Copy, Check, AlertTriangle
+  Archive, Edit3,
+  Trash2, RotateCcw, Search, SlidersHorizontal, FileText, Copy, Check, AlertTriangle,
+  Maximize2, Minimize2, Activity,
+  Inbox, ListTodo, Loader2, CheckCircle2, XCircle,
+  CircleDot, Flame, AlertOctagon, ChevronRight,
 } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -24,18 +27,34 @@ const COLUMNS: { id: Status; label: string }[] = [
 ]
 
 const PRIORITY_COLORS: Record<Priority, string> = {
-  low: 'var(--accent)',
-  medium: 'var(--primary)',
+  low: '#05d9e8',
+  medium: '#00ff41',
   high: '#ffb800',
-  critical: 'var(--pink)',
+  critical: '#ff2a6d',
+}
+
+const PRIORITY_ICONS: Record<Priority, any> = {
+  low: CircleDot,
+  medium: ChevronRight,
+  high: Flame,
+  critical: AlertOctagon,
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  backlog: 'var(--muted)',
-  in_progress: 'var(--warning)',
-  done: 'var(--primary)',
-  failed: 'var(--danger)',
-  archived: 'var(--muted)',
+  backlog: '#666',
+  todo: '#05d9e8',
+  in_progress: '#ffb800',
+  done: '#00ff41',
+  failed: '#ff2a6d',
+  archived: '#444',
+}
+
+const STATUS_ICONS: Record<string, any> = {
+  backlog: Inbox,
+  todo: ListTodo,
+  in_progress: Loader2,
+  done: CheckCircle2,
+  failed: XCircle,
 }
 
 const PRIORITY_LABELS: Record<Priority, string> = {
@@ -74,7 +93,6 @@ function TaskCard({
   onDragStart,
   isExecuting,
   onHistory,
-  onResponse,
 }: {
   task: Task
   onEdit: (t: Task) => void
@@ -83,17 +101,17 @@ function TaskCard({
   onDragStart: (e: React.DragEvent, t: Task) => void
   isExecuting: boolean
   onHistory: (t: Task) => void
-  onResponse: (t: Task) => void
 }) {
   const [hover, setHover] = useState(false)
   const due = getDueDateInfo(task.due_date)
 
-  // Show running state if this card is executing
-  const isRunning = isExecuting
+  // Show running state if this card is executing (local click) OR backend says in_progress
+  const isRunning = isExecuting || task.status === 'in_progress'
   const isFailed = task.status === 'failed'
 
-  // Check if task has a response (output) in its history
-  const hasResponse = (task.history || []).some((h: any) => h.details?.output)
+  // Pick status icon
+  const StatusIcon = STATUS_ICONS[task.status] || Inbox
+  const PrioIcon = PRIORITY_ICONS[task.priority as Priority] || CircleDot
 
   return (
     <div
@@ -126,18 +144,14 @@ function TaskCard({
           {!isRunning && <GripVertical size={12} style={{ color: 'var(--muted)', flexShrink: 0, marginTop: '2px' }} />}
           {isRunning && (
             <div style={{
-              flexShrink: 0, marginTop: '2px',
-              display: 'flex', alignItems: 'center', gap: '0.3rem',
-              color: 'var(--primary)', fontSize: '0.65rem', fontWeight: 600,
-            }}>
-              <div style={{
-                width: '10px', height: '10px',
-                borderRadius: '50%',
-                background: 'var(--primary)',
-                animation: 'pulse 1s infinite',
-              }} />
-              Running
+              flexShrink: 0,
+              display: 'flex', alignItems: 'center',
+            }} title="Hermes cron is executing this task right now">
+              <StatusIcon size={14} style={{ color: STATUS_COLORS[task.status] || '#ffb800', animation: 'spin 1.2s linear infinite' }} />
             </div>
+          )}
+          {!isRunning && (
+            <StatusIcon size={13} style={{ color: STATUS_COLORS[task.status] || '#666', flexShrink: 0, marginTop: '1px' }} />
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
@@ -205,42 +219,37 @@ function TaskCard({
             </div>
           )}
           <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.2rem',
             fontSize: '0.6rem',
-            color: PRIORITY_COLORS[task.priority as Priority] || 'var(--muted)',
+            color: PRIORITY_COLORS[task.priority as Priority] || '#666',
             marginLeft: 'auto',
           }}>
+            <PrioIcon size={9} />
             {PRIORITY_LABELS[task.priority as Priority] || task.priority}
           </div>
         </div>
 
-        {hover && !isRunning && (
+        {hover && (
           <div style={{
             display: 'flex', gap: '0.3rem', marginTop: '0.4rem',
             paddingLeft: '1.2rem',
           }}>
-            <button
-              onClick={(e) => { e.stopPropagation(); onExecute(task) }}
-              style={actionBtnStyle(isFailed ? 'var(--warning, #ffb000)' : 'var(--primary)')}
-              title={isFailed ? 'Retry' : 'Run'}
-            >
-              <Play size={10} /> {isFailed ? 'Retry' : 'Run'}
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onHistory(task) }}
-              style={actionBtnStyle('var(--accent)')}
-              title="History"
-            >
-              <MessageSquare size={10} />
-            </button>
-            {hasResponse && (
+            {!isRunning && (
               <button
-                onClick={(e) => { e.stopPropagation(); onResponse(task) }}
-                style={actionBtnStyle('var(--primary)')}
-                title="Response"
+                onClick={(e) => { e.stopPropagation(); onExecute(task) }}
+                style={actionBtnStyle(isFailed ? 'var(--warning, #ffb000)' : 'var(--primary)')}
+                title={isFailed ? 'Retry' : 'Run'}
               >
-                <FileText size={10} />
+                <RotateCcw size={10} /> {isFailed ? 'Retry' : 'Run'}
               </button>
             )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onHistory(task) }}
+              style={actionBtnStyle('#05d9e8')}
+              title="Details"
+            >
+              <Activity size={10} /> Details
+            </button>
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(task) }}
               style={actionBtnStyle('var(--accent)')}
@@ -287,7 +296,6 @@ function Column({
   isDragOver,
   executingTaskIds,
   onHistory,
-  onResponse,
 }: {
   status: Status
   label: string
@@ -301,7 +309,6 @@ function Column({
   isDragOver: boolean
   executingTaskIds: Set<string>
   onHistory: (t: Task) => void
-  onResponse: (t: Task) => void
 }) {
   return (
     <div
@@ -331,6 +338,18 @@ function Column({
             borderRadius: '1rem', background: 'rgba(255,255,255,0.06)',
             color: 'var(--muted)',
           }}>{tasks.length}</span>
+          {status === 'in_progress' && executingTaskIds.size > 0 && (
+            <span title={`${executingTaskIds.size} executing`} style={{
+              display: 'flex', alignItems: 'center', gap: '0.15rem',
+              fontSize: '0.6rem', color: 'var(--primary)',
+              fontWeight: 600, fontFamily: "'JetBrains Mono',monospace",
+            }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" style={{ animation: 'spin 1.2s linear infinite' }}>
+                <circle cx="12" cy="12" r="10" stroke="var(--primary)" strokeWidth="4" fill="none" strokeDasharray="30 10" strokeLinecap="round"/>
+              </svg>
+              {executingTaskIds.size}
+            </span>
+          )}
         </div>
       </div>
 
@@ -345,7 +364,6 @@ function Column({
             onDragStart={onDragStart}
             isExecuting={executingTaskIds.has(t.id)}
             onHistory={onHistory}
-            onResponse={onResponse}
           />
         ))}
         {tasks.length === 0 && (
@@ -370,14 +388,12 @@ function TaskModal({
   profiles,
   onClose,
   onSave,
-  onAddNote,
   isNew,
 }: {
   task: Partial<Task>
   profiles: Profile[]
   onClose: () => void
   onSave: (t: Partial<Task>) => void
-  onAddNote: (taskId: string, note: string) => void
   isNew: boolean
 }) {
   const [title, setTitle] = useState(task.title || '')
@@ -386,8 +402,6 @@ function TaskModal({
   const [tags, setTags] = useState(task.tags?.join(', ') || '')
   const [profile, setProfile] = useState(task.profile || 'default')
   const [dueDate, setDueDate] = useState(task.due_date || '')
-  const [noteText, setNoteText] = useState('')
-  const [showHistory, setShowHistory] = useState(false)
 
   const isValid = title.trim().length > 0
 
@@ -403,14 +417,6 @@ function TaskModal({
       due_date: dueDate || null,
     })
   }
-
-  const handleAddNote = () => {
-    if (!noteText.trim() || !task.id) return
-    onAddNote(task.id, noteText.trim())
-    setNoteText('')
-  }
-
-  const history = task.history || []
 
   return (
     <div
@@ -443,7 +449,7 @@ function TaskModal({
             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--txt)' }}>
               {isNew ? 'New Task' : 'Edit Task'}
             </span>
-            {!isNew && task?.id && (
+          {!isNew && task?.id && (
               <span style={{
                 fontSize: '0.6rem', color: 'var(--muted)', fontFamily: 'monospace',
                 background: 'rgba(0,0,0,0.25)', padding: '0.1rem 0.3rem',
@@ -529,133 +535,6 @@ function TaskModal({
               />
             </div>
           </div>
-
-          {!isNew && history.length > 0 && (
-            <div>
-              <button
-                onClick={() => setShowHistory(!showHistory)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '0.4rem',
-                  fontSize: '0.75rem', color: 'var(--accent)',
-                  background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                }}
-              >
-                <MessageSquare size={12} />
-                History ({history.length} entries)
-                <ChevronDown size={12} style={{ transform: showHistory ? 'rotate(180deg)' : 'none', transition: '0.15s' }} />
-              </button>
-
-              {showHistory && (
-                <div style={{
-                  marginTop: '0.5rem',
-                  background: 'rgba(0,0,0,0.15)',
-                  borderRadius: '0.5rem',
-                  padding: '0.75rem',
-                  maxHeight: '320px',
-                  overflow: 'auto',
-                }}>
-                  {[...history].reverse().map((h: any, i: number) => {
-                    const isCompleted = h.action === 'completed'
-                    return (
-                    <div key={i} style={{
-                      display: 'flex', flexDirection: 'column', gap: '0.2rem',
-                      marginBottom: '0.6rem',
-                      padding: '0.5rem',
-                      borderRadius: '0.3rem',
-                      background: isCompleted ? 'rgba(0,255,65,0.05)' : 'rgba(0,0,0,0.15)',
-                      borderLeft: isCompleted ? '3px solid var(--primary)' : '3px solid transparent',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <span style={{
-                          fontSize: '0.65rem', fontWeight: 700,
-                          color: isCompleted ? 'var(--primary)' : 'var(--txt)',
-                          background: isCompleted ? 'rgba(0,255,65,0.15)' : 'rgba(255,255,255,0.08)',
-                          padding: '0.1rem 0.35rem', borderRadius: '0.2rem',
-                          border: `1px solid ${isCompleted ? 'rgba(0,255,65,0.3)' : 'rgba(255,255,255,0.1)'}`,
-                          textTransform: 'uppercase', letterSpacing: '0.04em',
-                        }}>
-                          {isCompleted ? '✓ ' : ''}{h.action}
-                        </span>
-                        {h.from_status && (
-                          <span style={{ fontSize: '0.65rem', color: 'var(--accent)', opacity: 0.85 }}>
-                            <span style={{ textTransform: 'capitalize' }}>{h.from_status}</span>
-                            <ArrowRight size={7} style={{ margin: '0 0.2rem', verticalAlign: 'middle' }} />
-                            <span style={{ textTransform: 'capitalize' }}>{h.to_status}</span>
-                          </span>
-                        )}
-                        <span style={{ fontSize: '0.6rem', color: 'rgba(224,224,224,0.7)', marginLeft: 'auto' }}>
-                          {new Date(h.timestamp).toLocaleString('en-US', {
-                            day: '2-digit', month: '2-digit',
-                            hour: '2-digit', minute: '2-digit',
-                          })}
-                        </span>
-                      </div>
-                      {h.note && (
-                        <div style={{ color: 'var(--accent)', fontSize: '0.75rem', fontStyle: 'italic' }}>"{h.note}"</div>
-                      )}
-                      {h.details?.output && (
-                        <div style={{
-                          marginTop: '0.4rem',
-                          background: 'rgba(0,0,0,0.4)',
-                          borderRadius: '0.3rem',
-                          padding: '0.5rem 0.6rem',
-                          fontSize: '0.68rem',
-                          color: '#e8e8e8',
-                          maxHeight: '200px',
-                          overflow: 'auto',
-                          whiteSpace: 'pre-wrap',
-                          fontFamily: 'monospace',
-                          border: '1px solid rgba(0,255,65,0.15)',
-                        }}>
-                          <div style={{ color: 'var(--primary)', fontSize: '0.6rem', marginBottom: '0.3rem', fontWeight: 600, letterSpacing: '0.05em' }}>RESULTADO</div>
-                          {h.details.output}
-                        </div>
-                      )}
-                      {h.details?.error && (
-                        <div style={{
-                          marginTop: '0.3rem',
-                          background: 'rgba(255,42,109,0.1)',
-                          border: '1px solid rgba(255,42,109,0.3)',
-                          borderRadius: '0.3rem',
-                          padding: '0.3rem 0.5rem',
-                          fontSize: '0.65rem',
-                          color: '#ff6b6b',
-                          fontFamily: 'monospace',
-                        }}>
-                          ERROR: {h.details.error}
-                        </div>
-                      )}
-                      {isCompleted && h.details?.cron_job_id && (
-                        <div style={{ fontSize: '0.6rem', color: 'rgba(224,224,224,0.7)', marginTop: '0.2rem' }}>
-                          Job ID: {h.details.cron_job_id}
-                        </div>
-                      )}
-                    </div>
-                  )})}
-
-                  <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.5rem' }}>
-                    <input
-                      value={noteText}
-                      onChange={e => setNoteText(e.target.value)}
-                      placeholder="Add a note..."
-                      style={{ ...inputStyle(), fontSize: '0.7rem', padding: '0.25rem 0.4rem' }}
-                      onKeyDown={e => e.key === 'Enter' && handleAddNote()}
-                    />
-                    <button
-                      onClick={handleAddNote}
-                      style={{
-                        fontSize: '0.65rem', padding: '0.25rem 0.5rem',
-                        background: 'var(--primary)', color: 'var(--bg)',
-                        border: 'none', borderRadius: '0.25rem', cursor: 'pointer',
-                      }}
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         <div style={{
@@ -681,180 +560,63 @@ function TaskModal({
   )
 }
 
-function HistoryModal({ task, onClose }: { task: Task; onClose: () => void }) {
-  const history = task.history || []
+// ── TaskDetailsModal (unified History+Response with tabs + maximize) ──────
 
-  return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 70,
-        background: 'rgba(0,0,0,0.75)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '1rem',
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          background: 'var(--surf)',
-          border: '1px solid var(--border)',
-          borderRadius: '0.75rem',
-          width: '100%',
-          maxWidth: '720px',
-          maxHeight: '85vh',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-        }}
-      >
-        <div style={{
-          padding: '1rem 1.25rem',
-          borderBottom: '1px solid var(--border)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <div>
-            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--txt)' }}>History</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.15rem' }}>{task.title}</div>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--muted)', padding: '0.25rem',
-              display: 'flex', alignItems: 'center',
-            }}
-          >
-            <X size={16} />
-          </button>
-        </div>
+type DetailsTab = 'response' | 'history'
 
-        <div style={{ flex: 1, overflow: 'auto', padding: '1rem 1.25rem' }}>
-          {history.length === 0 ? (
-            <div style={{ fontSize: '0.75rem', color: 'var(--muted)', fontStyle: 'italic', textAlign: 'center', padding: '2rem 0' }}>
-              No history yet
-            </div>
-          ) : (
-            [...history].reverse().map((h: any, i: number) => (
-              <div key={i} style={{
-                marginBottom: '1rem',
-                paddingBottom: '1rem',
-                borderBottom: i < history.length - 1 ? '1px solid var(--border)' : 'none',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
-                  <span style={{
-                    fontSize: '0.7rem', fontWeight: 700,
-                    color: h.action === 'completed' ? 'var(--primary)'
-                      : h.action === 'executed' ? 'var(--accent)'
-                      : h.action === 'created' ? 'var(--txt)'
-                      : 'var(--muted)',
-                    textTransform: 'uppercase',
-                    background: h.action === 'completed' ? 'rgba(0,255,65,0.15)'
-                      : h.action === 'executed' ? 'rgba(5,217,232,0.15)'
-                      : 'rgba(255,255,255,0.08)',
-                    padding: '0.15rem 0.45rem',
-                    borderRadius: '0.2rem',
-                    border: `1px solid ${h.action === 'completed' ? 'rgba(0,255,65,0.4)'
-                      : h.action === 'executed' ? 'rgba(5,217,232,0.4)'
-                      : 'rgba(255,255,255,0.15)'}`,
-                  }}>
-                    {h.action === 'completed' ? '✓ ' : ''}{h.action}
-                  </span>
-                  <span style={{ fontSize: '0.7rem', color: 'rgba(224,224,224,0.8)' }}>
-                    {new Date(h.timestamp).toLocaleString('en-US', {
-                      day: '2-digit', month: '2-digit', year: '2-digit',
-                      hour: '2-digit', minute: '2-digit',
-                    })}
-                  </span>
-                  {h.from_status && (
-                    <span style={{ fontSize: '0.7rem', color: 'var(--accent)', opacity: 0.85 }}>
-                      <span style={{ textTransform: 'capitalize' }}>{h.from_status}</span>
-                      {' '}→{' '}
-                      <span style={{ textTransform: 'capitalize' }}>{h.to_status}</span>
-                    </span>
-                  )}
-                </div>
+function TaskDetailsModal({ task, onClose, initialTab }: { task: Task; onClose: () => void; initialTab?: DetailsTab }) {
+  const qc = useQueryClient()
+  const isRunning = task.status === 'in_progress'
+  const isDone = task.status === 'done'
+  const isFailed = task.status === 'failed'
+  const [liveLog, setLiveLog] = useState<string | null>(null)
+  const [maximized, setMaximized] = useState(false)
 
-                {h.note && (
-                  <div style={{
-                    fontSize: '0.75rem', color: 'var(--accent)',
-                    background: 'rgba(5,217,232,0.08)',
-                    border: '1px solid rgba(5,217,232,0.2)',
-                    padding: '0.35rem 0.55rem',
-                    borderRadius: '0.3rem',
-                    marginBottom: '0.3rem',
-                  }}>
-                    "{h.note}"
-                  </div>
-                )}
+  // Default tab: response if done, history otherwise
+  const [activeTab, setActiveTab] = useState<DetailsTab>(initialTab || (isDone ? 'response' : 'history'))
 
-                {h.details?.output && (
-                  <div style={{
-                    marginTop: '0.4rem',
-                    background: 'rgba(0,0,0,0.3)',
-                    border: '1px solid rgba(0,255,65,0.15)',
-                    borderRadius: '0.4rem',
-                    padding: '0.6rem 0.75rem',
-                    fontSize: '0.75rem',
-                    color: '#e0e0e0',
-                    maxHeight: '200px',
-                    overflow: 'auto',
-                    whiteSpace: 'pre-wrap',
-                    fontFamily: 'monospace',
-                    lineHeight: 1.5,
-                  }}>
-                    <div style={{ color: 'var(--primary)', fontSize: '0.65rem', marginBottom: '0.3rem', fontWeight: 600, letterSpacing: '0.05em' }}>RESULTADO</div>
-                    {h.details.output}
-                  </div>
-                )}
+  // Poll task data for updates when running
+  const { data: liveTask } = useQuery({
+    queryKey: ['task-live', task.id],
+    queryFn: () => tasksApi.get(task.id),
+    refetchInterval: isRunning ? 3000 : false,
+    enabled: isRunning,
+  })
 
-                {h.details?.error && (
-                  <div style={{
-                    marginTop: '0.3rem',
-                    background: 'rgba(255,42,109,0.1)',
-                    border: '1px solid rgba(255,42,109,0.3)',
-                    borderRadius: '0.3rem',
-                    padding: '0.35rem 0.55rem',
-                    fontSize: '0.7rem',
-                    color: '#ff6b6b',
-                    fontFamily: 'monospace',
-                  }}>
-                    ERROR: {h.details.error}
-                  </div>
-                )}
+  // Poll the execution log when running
+  const { data: logData } = useQuery({
+    queryKey: ['task-log', task.id],
+    queryFn: () => tasksApi.executeLog(task.id),
+    refetchInterval: isRunning ? 3000 : false,
+    enabled: isRunning,
+  })
 
-                {h.details && !h.details.output && Object.entries(h.details)
-                  .filter(([k]) => k !== 'cron_job_id')
-                  .map(([k, v]) => (
-                    <div key={k} style={{ fontSize: '0.65rem', color: 'rgba(224,224,224,0.75)', marginTop: '0.2rem' }}>
-                      <span style={{ color: 'var(--accent)', opacity: 0.7 }}>{k}:</span>{' '}
-                      <span>{String(v)}</span>
-                    </div>
-                  ))
-                }
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
+  // When task finishes, invalidate queries and stop polling
+  useEffect(() => {
+    if (liveTask && liveTask.status !== 'in_progress' && isRunning) {
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      // Auto-switch to response tab when done
+      if (liveTask.status === 'done') setActiveTab('response')
+    }
+  }, [liveTask, isRunning, qc])
 
-// ── ResponseModal ─────────────────────────────────────────────────────────────
+  // Update live log
+  useEffect(() => {
+    if (logData?.log) setLiveLog(logData.log)
+  }, [logData])
 
-function ResponseModal({ task, onClose }: { task: Task; onClose: () => void }) {
-  const history = task.history || []
-  // Find all entries with output, newest first
-  const responses = [...history]
-    .reverse()
-    .filter((h: any) => h.details?.output)
-  const [copied, setCopied] = useState(false)
+  // Use live task data if available, otherwise fall back to prop
+  const displayTask = liveTask || task
+  const history = displayTask.history || []
+  const responses = [...history].reverse().filter((h: any) => h.details?.output)
+  const hasResponse = responses.length > 0
 
-  const handleCopy = (text: string) => {
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+
+  const handleCopy = (text: string, idx: number) => {
     navigator.clipboard.writeText(text).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      setCopiedIndex(idx)
+      setTimeout(() => setCopiedIndex(null), 2000)
     })
   }
 
@@ -867,13 +629,18 @@ function ResponseModal({ task, onClose }: { task: Task; onClose: () => void }) {
     }
   }
 
+  const modalMaxWidth = maximized ? '100vw' : '780px'
+  const modalMaxHeight = maximized ? '100vh' : '85vh'
+  const modalRadius = maximized ? '0' : '0.75rem'
+  const modalPadding = maximized ? '0' : '1rem'
+
   return (
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 70,
-        background: 'rgba(0,0,0,0.75)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '1rem',
+        background: maximized ? 'rgba(0,0,0,0.92)' : 'rgba(0,0,0,0.75)',
+        display: 'flex', alignItems: maximized ? 'stretch' : 'center', justifyContent: maximized ? 'stretch' : 'center',
+        padding: modalPadding,
       }}
       onClick={onClose}
     >
@@ -881,64 +648,276 @@ function ResponseModal({ task, onClose }: { task: Task; onClose: () => void }) {
         onClick={e => e.stopPropagation()}
         style={{
           background: 'var(--surf)',
-          border: '1px solid var(--border)',
-          borderRadius: '0.75rem',
+          border: maximized ? 'none' : '1px solid var(--border)',
+          borderRadius: modalRadius,
           width: '100%',
-          maxWidth: '720px',
-          maxHeight: '85vh',
+          maxWidth: modalMaxWidth,
+          maxHeight: modalMaxHeight,
+          height: maximized ? '100%' : undefined,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
         }}
       >
+        {/* ── Header ─────────────────────────────────────────────────── */}
         <div style={{
-          padding: '1rem 1.25rem',
+          padding: '0.75rem 1.25rem',
           borderBottom: '1px solid var(--border)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexShrink: 0,
         }}>
-          <div>
-            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--txt)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <FileText size={14} style={{ color: 'var(--primary)' }} />
-              Response
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--txt)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                {activeTab === 'response' ? <FileText size={14} style={{ color: 'var(--primary)' }} /> : <Activity size={14} style={{ color: 'var(--accent)' }} />}
+                {activeTab === 'response' ? 'Response' : 'History'}
+                {isRunning && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <div className="animate-spin" style={{
+                      width: 12, height: 12, borderRadius: '50%',
+                      border: '2px solid var(--primary)', borderTopColor: 'transparent',
+                    }} />
+                    <span style={{ fontSize: '0.65rem', color: 'var(--primary)', fontWeight: 600 }}>RUNNING</span>
+                  </span>
+                )}
+                {isDone && !isRunning && <CheckCircle2 size={13} style={{ color: '#00ff41' }} />}
+                {isFailed && !isRunning && <XCircle size={13} style={{ color: '#ff2a6d' }} />}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.15rem' }}>{task.title}</div>
             </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.15rem' }}>{task.title}</div>
           </div>
-          <button
-            onClick={onClose}
-            style={{
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <button
+              onClick={() => setMaximized(!maximized)}
+              title={maximized ? 'Restore' : 'Maximize'}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--muted)', padding: '0.25rem',
+                display: 'flex', alignItems: 'center',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--txt)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}
+            >
+              {maximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
+            <button onClick={onClose} style={{
               background: 'none', border: 'none', cursor: 'pointer',
               color: 'var(--muted)', padding: '0.25rem',
               display: 'flex', alignItems: 'center',
+            }}>
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* ── Tab Bar ───────────────────────────────────────────────── */}
+        <div style={{
+          display: 'flex', borderBottom: '1px solid var(--border)',
+          flexShrink: 0,
+        }}>
+          <button
+            onClick={() => setActiveTab('response')}
+            style={{
+              flex: 1, padding: '0.5rem 1rem',
+              fontSize: '0.75rem', fontWeight: 600,
+              background: activeTab === 'response' ? 'rgba(0,255,65,0.08)' : 'transparent',
+              color: activeTab === 'response' ? 'var(--primary)' : 'var(--muted)',
+              border: 'none',
+              borderBottom: activeTab === 'response' ? '2px solid var(--primary)' : '2px solid transparent',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+              transition: 'all 0.15s',
             }}
           >
-            <X size={16} />
+            <FileText size={12} />
+            Response {hasResponse ? `(${responses.length})` : ''}
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            style={{
+              flex: 1, padding: '0.5rem 1rem',
+              fontSize: '0.75rem', fontWeight: 600,
+              background: activeTab === 'history' ? 'rgba(5,217,232,0.08)' : 'transparent',
+              color: activeTab === 'history' ? 'var(--accent)' : 'var(--muted)',
+              border: 'none',
+              borderBottom: activeTab === 'history' ? '2px solid var(--accent)' : '2px solid transparent',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+              transition: 'all 0.15s',
+            }}
+          >
+            <Activity size={12} />
+            History ({history.length})
           </button>
         </div>
 
-        <div style={{ flex: 1, overflow: 'auto', padding: '1rem 1.25rem' }}>
-          {responses.length === 0 ? (
-            <div style={{ fontSize: '0.75rem', color: 'var(--muted)', fontStyle: 'italic', textAlign: 'center', padding: '2rem 0' }}>
-              No response data available
+        {/* ── Live log when running ───────────────────────────────────── */}
+        {isRunning && liveLog && (
+          <div style={{
+            padding: '0.75rem 1.25rem',
+            borderBottom: '1px solid var(--border)',
+            background: 'rgba(0,0,0,0.25)',
+            flexShrink: 0,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
+              <div className="animate-spin" style={{
+                width: 10, height: 10, borderRadius: '50%',
+                border: '2px solid var(--accent)', borderTopColor: 'transparent',
+              }} />
+              <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--accent)', letterSpacing: '0.04em' }}>LIVE OUTPUT</span>
             </div>
-          ) : (
-            responses.map((h: any, i: number) => (
-              <div key={i} style={{
-                marginBottom: responses.length > 1 ? '1.5rem' : 0,
-                paddingBottom: responses.length > 1 && i < responses.length - 1 ? '1.5rem' : 0,
-                borderBottom: responses.length > 1 && i < responses.length - 1 ? '1px solid var(--border)' : 'none',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{
+              background: 'rgba(0,0,0,0.4)',
+              border: '1px solid rgba(5,217,232,0.2)',
+              borderRadius: '0.4rem',
+              padding: '0.6rem',
+              fontSize: '0.7rem',
+              color: '#b0e0b0',
+              maxHeight: '180px',
+              overflow: 'auto',
+              whiteSpace: 'pre-wrap',
+              fontFamily: 'monospace',
+              lineHeight: 1.5,
+            }}>
+              {liveLog}
+            </div>
+          </div>
+        )}
+
+        {/* ── Tab Content ─────────────────────────────────────────────── */}
+        <div style={{ flex: 1, overflow: 'auto', padding: '1rem 1.25rem' }}>
+
+          {/* RESPONSE TAB */}
+          {activeTab === 'response' && (
+            responses.length === 0 ? (
+              <div style={{ fontSize: '0.75rem', color: 'var(--muted)', fontStyle: 'italic', textAlign: 'center', padding: '2rem 0' }}>
+                {isRunning ? 'Task is running... response will appear here when done' : 'No response data available'}
+              </div>
+            ) : (
+              responses.map((h: any, i: number) => (
+                <div key={i} style={{
+                  marginBottom: responses.length > 1 ? '1.5rem' : 0,
+                  paddingBottom: responses.length > 1 && i < responses.length - 1 ? '1.5rem' : 0,
+                  borderBottom: responses.length > 1 && i < responses.length - 1 ? '1px solid var(--border)' : 'none',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{
+                        fontSize: '0.7rem', fontWeight: 700,
+                        color: h.action === 'completed' ? 'var(--primary)' : 'var(--accent)',
+                        textTransform: 'uppercase',
+                        background: h.action === 'completed' ? 'rgba(0,255,65,0.15)' : 'rgba(5,217,232,0.15)',
+                        padding: '0.15rem 0.45rem',
+                        borderRadius: '0.2rem',
+                        border: `1px solid ${h.action === 'completed' ? 'rgba(0,255,65,0.4)' : 'rgba(5,217,232,0.4)'}`,
+                      }}>
+                        {h.action === 'completed' ? '✓ ' : ''}{h.action}
+                      </span>
+                      <span style={{ fontSize: '0.7rem', color: 'rgba(224,224,224,0.8)' }}>
+                        {new Date(h.timestamp).toLocaleString('en-US', {
+                          day: '2-digit', month: '2-digit', year: '2-digit',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => handleCopy(String(h.details.output), i)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.3rem',
+                        fontSize: '0.7rem', padding: '0.3rem 0.6rem',
+                        background: copiedIndex === i ? 'rgba(0,255,65,0.15)' : 'rgba(255,255,255,0.06)',
+                        color: copiedIndex === i ? 'var(--primary)' : 'var(--txt)',
+                        border: `1px solid ${copiedIndex === i ? 'rgba(0,255,65,0.3)' : 'var(--border)'}`,
+                        borderRadius: '0.3rem', cursor: 'pointer',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {copiedIndex === i ? <><Check size={10} /> Copied</> : <><Copy size={10} /> Copy</>}
+                    </button>
+                  </div>
+
+                  <div
+                    className="response-markdown"
+                    style={{
+                      background: 'rgba(0,0,0,0.25)',
+                      border: '1px solid rgba(0,255,65,0.2)',
+                      borderRadius: '0.5rem',
+                      padding: '1rem 1.25rem',
+                      color: '#e8e8e8',
+                      lineHeight: 1.6,
+                      overflow: 'auto',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(String(h.details.output)) }}
+                  />
+
+                  {h.details?.error && (
+                    <div style={{
+                      marginTop: '0.5rem',
+                      background: 'rgba(255,42,109,0.1)',
+                      border: '1px solid rgba(255,42,109,0.3)',
+                      borderRadius: '0.3rem',
+                      padding: '0.5rem 0.75rem',
+                      fontSize: '0.75rem',
+                      color: '#ff6b6b',
+                      fontFamily: 'monospace',
+                    }}>
+                      ERROR: {h.details.error}
+                    </div>
+                  )}
+                </div>
+              ))
+            )
+          )}
+
+          {/* HISTORY TAB */}
+          {activeTab === 'history' && (
+            history.length === 0 ? (
+              <div style={{ fontSize: '0.75rem', color: 'var(--muted)', fontStyle: 'italic', textAlign: 'center', padding: '2rem 0' }}>
+                No history yet
+              </div>
+            ) : (
+              [...history].reverse().map((h: any, i: number) => {
+                const isProgress = h.action === 'progress'
+                const isCompleted = h.action === 'completed'
+                return (
+                <div key={i} style={{
+                  marginBottom: '1rem',
+                  paddingBottom: '1rem',
+                  borderBottom: i < history.length - 1 ? '1px solid var(--border)' : 'none',
+                  opacity: isProgress ? 0.65 : 1,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
+                    {isProgress && (
+                      <div className="animate-spin" style={{
+                        width: 10, height: 10, borderRadius: '50%',
+                        border: '2px solid var(--accent)', borderTopColor: 'transparent', flexShrink: 0,
+                      }} />
+                    )}
                     <span style={{
                       fontSize: '0.7rem', fontWeight: 700,
-                      color: h.action === 'completed' ? 'var(--primary)' : 'var(--accent)',
+                      color: isCompleted ? 'var(--primary)'
+                        : h.action === 'executed' ? 'var(--accent)'
+                        : h.action === 'dispatched' ? 'var(--warning, #ffb000)'
+                        : h.action === 'created' ? 'var(--txt)'
+                        : h.action === 'failed' ? 'var(--pink)'
+                        : isProgress ? 'var(--accent)'
+                        : 'var(--muted)',
                       textTransform: 'uppercase',
-                      background: h.action === 'completed' ? 'rgba(0,255,65,0.15)' : 'rgba(5,217,232,0.15)',
+                      background: isCompleted ? 'rgba(0,255,65,0.15)'
+                        : h.action === 'executed' ? 'rgba(5,217,232,0.15)'
+                        : h.action === 'failed' ? 'rgba(255,42,109,0.15)'
+                        : isProgress ? 'rgba(5,217,232,0.08)'
+                        : 'rgba(255,255,255,0.08)',
                       padding: '0.15rem 0.45rem',
                       borderRadius: '0.2rem',
-                      border: `1px solid ${h.action === 'completed' ? 'rgba(0,255,65,0.4)' : 'rgba(5,217,232,0.4)'}`,
+                      border: `1px solid ${isCompleted ? 'rgba(0,255,65,0.4)'
+                        : h.action === 'executed' ? 'rgba(5,217,232,0.4)'
+                        : h.action === 'failed' ? 'rgba(255,42,109,0.4)'
+                        : isProgress ? 'rgba(5,217,232,0.25)'
+                        : 'rgba(255,255,255,0.15)'}`,
                     }}>
-                      {h.action === 'completed' ? '✓ ' : ''}{h.action}
+                      {isCompleted ? '✓ ' : ''}{h.action}
                     </span>
                     <span style={{ fontSize: '0.7rem', color: 'rgba(224,224,224,0.8)' }}>
                       {new Date(h.timestamp).toLocaleString('en-US', {
@@ -946,54 +925,88 @@ function ResponseModal({ task, onClose }: { task: Task; onClose: () => void }) {
                         hour: '2-digit', minute: '2-digit',
                       })}
                     </span>
+                    {h.from_status && (
+                      <span style={{ fontSize: '0.7rem', color: 'var(--accent)', opacity: 0.85 }}>
+                        <span style={{ textTransform: 'capitalize' }}>{h.from_status}</span>
+                        {' '}→{' '}
+                        <span style={{ textTransform: 'capitalize' }}>{h.to_status}</span>
+                      </span>
+                    )}
                   </div>
-                  <button
-                    onClick={() => handleCopy(String(h.details.output))}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '0.3rem',
-                      fontSize: '0.7rem', padding: '0.3rem 0.6rem',
-                      background: copied ? 'rgba(0,255,65,0.15)' : 'rgba(255,255,255,0.06)',
-                      color: copied ? 'var(--primary)' : 'var(--txt)',
-                      border: `1px solid ${copied ? 'rgba(0,255,65,0.3)' : 'var(--border)'}`,
-                      borderRadius: '0.3rem', cursor: 'pointer',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    {copied ? <><Check size={10} /> Copied</> : <><Copy size={10} /> Copy</>}
-                  </button>
+
+                  {h.note && !isProgress && (
+                    <div style={{
+                      fontSize: '0.75rem', color: 'var(--accent)',
+                      background: 'rgba(5,217,232,0.08)',
+                      border: '1px solid rgba(5,217,232,0.2)',
+                      padding: '0.35rem 0.55rem',
+                      borderRadius: '0.3rem',
+                      marginBottom: '0.3rem',
+                    }}>
+                      "{h.note}"
+                    </div>
+                  )}
+
+                  {isProgress && h.note && (
+                    <div style={{
+                      fontSize: '0.7rem', color: 'var(--accent)',
+                      background: 'rgba(5,217,232,0.05)',
+                      padding: '0.2rem 0.4rem',
+                      borderRadius: '0.2rem',
+                      marginBottom: '0.2rem',
+                    }}>
+                      {h.note}
+                    </div>
+                  )}
+
+                  {h.details?.output && (
+                    <div style={{
+                      marginTop: '0.4rem',
+                      background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid rgba(0,255,65,0.15)',
+                      borderRadius: '0.4rem',
+                      padding: '0.6rem 0.75rem',
+                      fontSize: '0.75rem',
+                      color: '#e0e0e0',
+                      maxHeight: '150px',
+                      overflow: 'auto',
+                      whiteSpace: 'pre-wrap',
+                      fontFamily: 'monospace',
+                      lineHeight: 1.5,
+                    }}>
+                      <div style={{ color: 'var(--primary)', fontSize: '0.65rem', marginBottom: '0.3rem', fontWeight: 600, letterSpacing: '0.05em' }}>RESULTADO</div>
+                      {h.details.output}
+                    </div>
+                  )}
+
+                  {h.details?.error && (
+                    <div style={{
+                      marginTop: '0.3rem',
+                      background: 'rgba(255,42,109,0.1)',
+                      border: '1px solid rgba(255,42,109,0.3)',
+                      borderRadius: '0.3rem',
+                      padding: '0.35rem 0.55rem',
+                      fontSize: '0.7rem',
+                      color: '#ff6b6b',
+                      fontFamily: 'monospace',
+                    }}>
+                      ERROR: {h.details.error}
+                    </div>
+                  )}
+
+                  {h.details && !h.details.output && !isProgress && Object.entries(h.details)
+                    .filter(([k]) => k !== 'cron_job_id')
+                    .map(([k, v]) => (
+                      <div key={k} style={{ fontSize: '0.65rem', color: 'rgba(224,224,224,0.75)', marginTop: '0.2rem' }}>
+                        <span style={{ color: 'var(--accent)', opacity: 0.7 }}>{k}:</span>{' '}
+                        <span>{String(v)}</span>
+                      </div>
+                    ))
+                  }
                 </div>
-
-                <div
-                  className="response-markdown"
-                  style={{
-                    background: 'rgba(0,0,0,0.25)',
-                    border: '1px solid rgba(0,255,65,0.2)',
-                    borderRadius: '0.5rem',
-                    padding: '1rem 1.25rem',
-                    color: '#e8e8e8',
-                    lineHeight: 1.6,
-                    maxHeight: '50vh',
-                    overflow: 'auto',
-                  }}
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(String(h.details.output)) }}
-                />
-
-                {h.details?.error && (
-                  <div style={{
-                    marginTop: '0.5rem',
-                    background: 'rgba(255,42,109,0.1)',
-                    border: '1px solid rgba(255,42,109,0.3)',
-                    borderRadius: '0.3rem',
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.75rem',
-                    color: '#ff6b6b',
-                    fontFamily: 'monospace',
-                  }}>
-                    ERROR: {h.details.error}
-                  </div>
-                )}
-              </div>
-            ))
+                )
+              })
+            )
           )}
         </div>
       </div>
@@ -1079,13 +1092,17 @@ function ArchivedView({
   tasks,
   onRestore,
   onDelete,
+  onPurge,
   onClose,
 }: {
   tasks: Task[]
   onRestore: (t: Task) => void
   onDelete: (t: Task) => void
+  onPurge: () => void
   onClose: () => void
 }) {
+  const [confirmPurge, setConfirmPurge] = useState(false)
+
   return (
     <div
       style={{
@@ -1126,6 +1143,61 @@ function ArchivedView({
             <X size={14} />
           </button>
         </div>
+
+        {!confirmPurge && tasks.length > 0 && (
+          <div style={{ padding: '0.5rem 1.25rem 0', display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => setConfirmPurge(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.3rem',
+                fontSize: '0.7rem', padding: '0.3rem 0.6rem',
+                background: 'rgba(255,42,109,0.08)',
+                color: 'var(--pink)',
+                border: '1px solid rgba(255,42,109,0.25)',
+                borderRadius: '0.25rem',
+                cursor: 'pointer',
+              }}
+              title="Permanently delete ALL archived tasks"
+            >
+              <Trash2 size={10} />
+              Purge All
+            </button>
+          </div>
+        )}
+
+        {confirmPurge && (
+          <div style={{ padding: '0.5rem 1.25rem 0', display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
+            <span style={{ fontSize: '0.7rem', color: 'var(--warning)', marginRight: '0.3rem' }}>
+              Delete {tasks.length} archived tasks forever?
+            </span>
+            <button
+              onClick={() => { onPurge(); setConfirmPurge(false); }}
+              style={{
+                fontSize: '0.7rem', padding: '0.25rem 0.5rem',
+                background: 'var(--pink)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.25rem',
+                cursor: 'pointer',
+              }}
+            >
+              Yes, purge it
+            </button>
+            <button
+              onClick={() => setConfirmPurge(false)}
+              style={{
+                fontSize: '0.7rem', padding: '0.25rem 0.5rem',
+                background: 'transparent',
+                color: 'var(--muted)',
+                border: '1px solid var(--border)',
+                borderRadius: '0.25rem',
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         <div style={{ flex: 1, overflow: 'auto', padding: '1rem' }}>
           {tasks.length === 0 ? (
@@ -1391,7 +1463,6 @@ export default function Kanban() {
   const [showArchived, setShowArchived] = useState(false)
   const [executingTaskIds, setExecutingTaskIds] = useState<Set<string>>(new Set())
   const [historyTask, setHistoryTask] = useState<Task | null>(null)
-  const [responseTask, setResponseTask] = useState<Task | null>(null)
 
   const hasRunningTasks = executingTaskIds.size > 0
 
@@ -1475,9 +1546,13 @@ export default function Kanban() {
     },
   })
 
-  const addNoteMutation = useMutation({
-    mutationFn: ({ id, note }: { id: string; note: string }) => tasksApi.addHistoryNote(id, note),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks'] }),
+  const purgeMutation = useMutation({
+    mutationFn: () => tasksApi.purgeAllArchived(),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['tasks-archived'] })
+      showToast(`${data.deleted_count} archived tasks purged`, true)
+    },
+    onError: () => showToast('Failed to purge archived tasks', false),
   })
 
   const tasks: Task[] = tasksData?.tasks ?? []
@@ -1485,23 +1560,34 @@ export default function Kanban() {
   const profiles: Profile[] = profilesData?.profiles ?? []
 
   // Clean up executingTaskIds when tasks are no longer in_progress
+  // Also detect tasks that are in_progress from server but not in our local set
   useEffect(() => {
-    if (executingTaskIds.size === 0) return
+    const serverInProgress = new Set(
+      tasks.filter(t => t.status === 'in_progress').map(t => t.id)
+    )
+    // Remove local IDs that are no longer running on server
     const toRemove: string[] = []
     for (const id of executingTaskIds) {
-      const task = tasks.find(t => t.id === id)
-      if (task && task.status !== 'in_progress') {
+      if (!serverInProgress.has(id)) {
         toRemove.push(id)
       }
     }
-    if (toRemove.length > 0) {
+    // Add server IDs that are running but not in our local set
+    const toAdd: string[] = []
+    for (const id of serverInProgress) {
+      if (!executingTaskIds.has(id)) {
+        toAdd.push(id)
+      }
+    }
+    if (toRemove.length > 0 || toAdd.length > 0) {
       setExecutingTaskIds(prev => {
         const next = new Set(prev)
         for (const id of toRemove) next.delete(id)
+        for (const id of toAdd) next.add(id)
         return next
       })
     }
-  }, [tasks, executingTaskIds])
+  }, [tasks])
 
   const filteredTasks = tasks.filter(t => {
     if (filters.profile && t.profile !== filters.profile) return false
@@ -1573,10 +1659,6 @@ export default function Kanban() {
     setHistoryTask(t)
   }
 
-  const handleOpenResponse = (t: Task) => {
-    setResponseTask(t)
-  }
-
   const askArchiveAllDone = () => {
     const count = doneOrFailedCount
     setConfirmModal({
@@ -1587,8 +1669,6 @@ export default function Kanban() {
       danger: true,
     })
   }
-
-  const handleAddNote = (id: string, note: string) => addNoteMutation.mutate({ id, note })
 
   const handleRestore = (t: Task) => {
     moveMutation.mutate({ id: t.id, status: 'backlog' })
@@ -1666,7 +1746,7 @@ export default function Kanban() {
               }}
             >
               <Archive size={12} />
-              Archive {doneOrFailedCount} Done
+              Archive {doneOrFailedCount} Done/Failed
             </button>
           )}
           <button
@@ -1732,7 +1812,6 @@ export default function Kanban() {
             isDragOver={dragOverCol === col.id}
             executingTaskIds={executingTaskIds}
             onHistory={handleOpenHistory}
-            onResponse={handleOpenResponse}
           />
         ))}
       </div>
@@ -1743,7 +1822,6 @@ export default function Kanban() {
           profiles={profiles}
           onClose={() => { setShowModal(false); setEditingTask(null) }}
           onSave={handleSave}
-          onAddNote={handleAddNote}
           isNew={!editingTask?.id}
         />
       )}
@@ -1753,21 +1831,16 @@ export default function Kanban() {
           tasks={archived}
           onRestore={handleRestore}
           onDelete={handleDelete}
+          onPurge={() => purgeMutation.mutate()}
           onClose={() => setShowArchived(false)}
         />
       )}
 
       {historyTask && (
-        <HistoryModal
+        <TaskDetailsModal
           task={historyTask}
           onClose={() => setHistoryTask(null)}
-        />
-      )}
-
-      {responseTask && (
-        <ResponseModal
-          task={responseTask}
-          onClose={() => setResponseTask(null)}
+          initialTab={historyTask.status === 'done' ? 'response' : 'history'}
         />
       )}
 

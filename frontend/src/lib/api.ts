@@ -388,7 +388,10 @@ export const tasksApi = {
     api.post(`/tasks/${id}/history`, { note }).then(r => r.data),
   listArchived: () => api.get<{ archived: Task[] }>('/tasks/archived/list').then(r => r.data),
   restore: (id: string) => api.post<Task>(`/tasks/${id}/restore`).then(r => r.data),
+  purgeAllArchived: () => api.post<{ ok: boolean; deleted_count: number }>('/tasks/purge-all-archived').then(r => r.data),
   gatewayStatus: () => api.get<{ ticker_alive: boolean; last_tick_age_secs: number | null; gateway_pid: number | null; error?: string }>('/tasks/gateway/status').then(r => r.data),
+  executeStatus: (id: string) => api.get<{ executing: boolean; cron_job_id?: string; status?: string; done?: boolean }>(`/tasks/${id}/execute/status`).then(r => r.data),
+  executeLog: (id: string) => api.get<{ task_id: string; running: boolean; cron_job_id?: string; log: string | null; output: string | null; status?: string }>(`/tasks/${id}/execute/log`).then(r => r.data),
 }
 
 // ── Config ─────────────────────────────────────────────────────────────────

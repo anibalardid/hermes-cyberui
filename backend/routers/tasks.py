@@ -17,8 +17,28 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 router = APIRouter()
-EXEC_TIMEOUT_SECS = 600  # 10 minutes — max polling timeout per task execution
-EXEC_INACTIVITY_SECS = 120  # 2 minutes — fail fast if no heartbeat activity
+EXEC_TIMEOUT_SECS = 1800  # 30 minutes — max polling timeout per task execution
+
+# Inactivity timeout is dynamic based on task priority.
+# Tasks that are known to be short (Low) fail faster; long tasks (High/Critical) wait longer.
+def _get_inactivity_timeout(priority: str | None) -> int:
+    """Return max seconds without heartbeat before failing a task.
+
+    Tiers:
+    - Critical: 20 min (1200s) — longest-running analysis, multi-agent pipelines
+    - High:     15 min (900s) — research, coding, deep investigation
+    - Medium:   10 min (600s) — standard tasks (DEFAULT)
+    - Low:       5 min (300s) — quick tasks, less tolerance
+    """
+    return {
+        "critical": 1200,
+        "high":     900,
+        "medium":   600,
+        "low":      300,
+    }.get((priority or "").lower(), 600)
+
+# Kept for backward compatibility with any hard-coded references
+EXEC_INACTIVITY_SECS = _get_inactivity_timeout("medium")
 
 # Real (non-profile) Hermes home for cron operations.
 # The gateway ticker reads from the real ~/.hermes, not the profile sandbox.
@@ -152,7 +172,7 @@ def _load_safe() -> dict:
 
 
 def _now() -> str:
-    return datetime.utcnow().isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _make_history(action: str, from_status: str | None = None,
@@ -437,17 +457,30 @@ def _reset_stale_in_progress_tasks():
         _save(data)
 
 
-def _poll_job_and_update_task(task_id: str, job_id: str, timeout_secs: int = EXEC_TIMEOUT_SECS):
+def _delete_cron_job(job_id: str):
+    """Delete a cron job after task completion to prevent recurring execution.
+    Silently ignores errors since the task outcome is already determined."""
+    try:
+        _cron = _import_cron_module("cron.jobs")
+        _cron.remove_job(job_id)
+    except Exception:
+        pass  # Best-effort cleanup; task result is already decided
+
+
+def _poll_job_and_update_task(task_id: str, job_id: str, timeout_secs: int = EXEC_TIMEOUT_SECS, task_priority: str | None = None):
     """
     Polling worker that runs in a background thread.
     Polls the cron job every 6s for up to `timeout_secs`, then updates the task
     as done/failed in tasks.json with proper error detail on timeout.
 
     Features:
-    - Heartbeat detection: if no activity detected for EXEC_INACTIVITY_SECS,
-      marks task as 'failed' immediately (e.g. gateway ticker died).
-    - Maximum timeout: EXEC_TIMEOUT_SECS (10 min) for legitimate long tasks.
+    - Dynamic inactivity timeout based on task priority (default 5 min)
+    - Better heartbeat: detects job state=running and resets timer
+    - Smart waiting: if job is scheduled with future next_run_at, resets timer
+    - Fast failure: if job stays in 'scheduled' for >SCHEDULED_STUCK_SECS without
+      ever transitioning to running/executing, fail early (gateway ticker likely dead)
     - On timeout or inactivity, task status = 'failed' (not 'done').
+    - Deletes cron job after completion to prevent recurring execution.
 
     Wrapped in a global try/except to guarantee cleanup: even if the polling
     logic crashes, the task is always moved out of in_progress and _task_locks
@@ -455,19 +488,29 @@ def _poll_job_and_update_task(task_id: str, job_id: str, timeout_secs: int = EXE
     """
     import logging
     logger = logging.getLogger("tasks.poll")
-    logger.info(f"[poll] Started polling task={task_id} job={job_id} timeout={timeout_secs}s")
+
+    # Resolve per-task inactivity timeout
+    inactivity_secs = _get_inactivity_timeout(task_priority)
+    SCHEDULED_STUCK_SECS = 600  # If job stays "scheduled" for >10min with NO output, NO completions, and NO runs, fail fast
+    logger.info(f"[poll] Started polling task={task_id} job={job_id} timeout={timeout_secs}s inactivity={inactivity_secs}s priority={task_priority}")
 
     try:
         start = time_module.time()
         last_activity = start  # Track last heartbeat
+        last_progress_write = start  # Track when we last wrote a progress history entry
         output_text = None
         timeout_reached = False
         inactivity_reached = False
         error_detail = None
+        running_detected = False
+        was_scheduled = False
+        scheduled_since = None  # Track when we first saw state=scheduled
 
         # Pre-cache imports to avoid doing them inside the hot loop
         _cron = _import_cron_module("cron.jobs")
         get_job = _cron.get_job
+
+        PROGRESS_INTERVAL_SECS = 30  # Write progress to history every 30s
 
         while time_module.time() - start < timeout_secs:
             time_module.sleep(6)
@@ -483,6 +526,7 @@ def _poll_job_and_update_task(task_id: str, job_id: str, timeout_secs: int = EXE
                 job_state = job.get("state", "")
                 job_last_run = job.get("last_run_at")
                 job_completed = job.get("repeat", {}).get("completed", 0)
+                next_run = job.get("next_run_at")
 
                 # Activity detected if: job has been run, or output dir has files
                 job_out_dir = CRON_OUTPUT_DIR / job_id
@@ -495,23 +539,102 @@ def _poll_job_and_update_task(task_id: str, job_id: str, timeout_secs: int = EXE
                         logger.info(f"[poll] Got output for task={task_id} job={job_id} ({len(output_text)} chars)")
                         break  # SUCCESS — exit loop with output
 
-                # Check if the job has been executed at least once (heartbeat)
-                if job_last_run or has_output_files or job_completed > 0 or job_state == "running":
-                    last_activity = time_module.time()
+                # ── Improved heartbeat: more signals count as activity ──────
+                now_epoch = time_module.time()
+                is_active = (
+                    job_state == "running"
+                    or job_state == "executing"
+                    or has_output_files
+                    or job_completed > 0
+                    or job_last_run
+                    or (job_state == "scheduled" and next_run and datetime.fromisoformat(next_run) > datetime.now(timezone.utc))
+                    or (job_state == "scheduled" and was_scheduled is True)  # already seen queued before
+                )
+
+                if job_state == "running":
+                    running_detected = True
+                    last_activity = now_epoch
+                    scheduled_since = None  # No longer stuck in scheduled
+                    logger.debug(f"[poll] Heartbeat RUNNING for task={task_id} job={job_id}")
+                elif is_active:
+                    last_activity = now_epoch
+                    was_scheduled = was_scheduled or job_state == "scheduled"
                     logger.debug(f"[poll] Heartbeat for task={task_id} job={job_id} (state={job_state}, completed={job_completed})")
+
+                # ── Fast failure: job stuck in 'scheduled' too long ─────────
+                # If we've never seen the job transition to running/executing,
+                # never detected any output, and the job has never completed a run,
+                # it's likely the gateway ticker is dead or not picking up jobs.
+                # But if the job HAS been run (completed > 0 or last_run_at set),
+                # we don't consider it "stuck" — it just hasn't transitioned state yet.
+                if not running_detected and job_state == "scheduled" and job_completed == 0 and not job_last_run and not has_output_files:
+                    if scheduled_since is None:
+                        scheduled_since = now_epoch
+                    elif (now_epoch - scheduled_since) >= SCHEDULED_STUCK_SECS:
+                        error_detail = f"Job stuck in 'scheduled' state for {int(now_epoch - scheduled_since)}s — no runs, no output, gateway ticker may not be executing new jobs. Try: hermes gateway restart"
+                        logger.warning(f"[poll] SCHEDULED STUCK for task={task_id} job={job_id} ({int(now_epoch - scheduled_since)}s, never ran, no output)")
+                        break
+                else:
+                    # Reset scheduled tracking if we see signs of life or non-scheduled state
+                    scheduled_since = None
 
                 # Check if job reached terminal state
                 if job_state in ("done", "paused", "completed"):
                     logger.info(f"[poll] Job {job_id} state={job_state} for task {task_id}")
                     break
+                # Check if job errored out (Hermes sets last_status=error, state may still be scheduled)
+                if job.get("last_status") in ("error", "failed"):
+                    last_error = job.get("last_error") or "Unknown cron error"
+                    error_detail = f"Cron execution failed: {last_error}"
+                    logger.warning(f"[poll] Job {job_id} last_status={job.get('last_status')} for task {task_id}: {last_error}")
+                    break
+                # Check if last_run is recent AND completed count went up (successful one-shot)
+                if job_completed > 0 and job_state in ("scheduled",):
+                    # Likely a one-shot job that ran once and is now waiting for next tick — it succeeded
+                    # If last_status is ok (or any success), consider it done even without output files
+                    if job.get("last_status") in ("ok", "success") and job_last_run:
+                        logger.info(f"[poll] Job {job_id} completed successfully (last_status={job.get('last_status')}, completed={job_completed})")
+                        break
+                    if has_output_files:
+                        break
+                    # Give it a few cycles to write output before declaring failure
+                    pass
 
                 # ── Inactivity check (fail fast if ticker died) ───────────
                 elapsed_inactive = time_module.time() - last_activity
-                if elapsed_inactive >= EXEC_INACTIVITY_SECS:
+                if elapsed_inactive >= inactivity_secs:
                     inactivity_reached = True
-                    error_detail = f"No activity for {EXEC_INACTIVITY_SECS}s — gateway ticker may be stopped. Restart with: hermes gateway restart"
-                    logger.warning(f"[poll] Inactivity timeout for task={task_id} job={job_id} ({EXEC_INACTIVITY_SECS}s no heartbeat)")
+                    error_detail = f"No activity for {int(elapsed_inactive)}s — job may be stuck in queue or gateway ticker stopped. Restart with: hermes gateway restart"
+                    logger.warning(f"[poll] Inactivity timeout for task={task_id} job={job_id} ({int(elapsed_inactive)}s no heartbeat)")
                     break
+
+                # ── Progress heartbeat: write status to history every N seconds ──
+                now_progress = time_module.time()
+                if now_progress - last_progress_write >= PROGRESS_INTERVAL_SECS:
+                    elapsed_total = int(now_progress - start)
+                    state_label = job_state or "unknown"
+                    status_msg = f"Still executing... ({elapsed_total}s elapsed, state={state_label})"
+                    if running_detected:
+                        status_msg = f"Agent is working... ({elapsed_total}s elapsed)"
+                    with _data_transaction():
+                        pdata = _load()
+                        for pt in pdata.get("tasks", []):
+                            if pt["id"] == task_id:
+                                pt["history"].append({
+                                    "timestamp": _now(),
+                                    "action": "progress",
+                                    "note": status_msg,
+                                    "details": {
+                                        "cron_job_id": job_id,
+                                        "elapsed_secs": elapsed_total,
+                                        "job_state": state_label,
+                                    },
+                                })
+                                pt["updated_at"] = _now()
+                                break
+                        pdata["updated_at"] = _now()
+                        _save(pdata)
+                    last_progress_write = now_progress
 
             except Exception as e:
                 error_detail = f"Polling error: {e}"
@@ -547,6 +670,9 @@ def _poll_job_and_update_task(task_id: str, job_id: str, timeout_secs: int = EXE
                         history_details["error"] = error_detail
                     elif error_detail:
                         history_details["error"] = error_detail
+                    # Clean up stale progress entries — they show "Still executing..."
+                    # which is misleading once the task has actually finished.
+                    t["history"] = [h for h in t.get("history", []) if h.get("action") != "progress"]
                     t["history"].append({
                         "timestamp": _now(),
                         "action": "failed" if is_failed else "completed",
@@ -559,6 +685,12 @@ def _poll_job_and_update_task(task_id: str, job_id: str, timeout_secs: int = EXE
                     break
             data["updated_at"] = _now()
             _save(data)
+
+        # ── Delete the cron job now that the task is resolved ────────────
+        # The cron job was created with schedule="* * * * *" (recurring). If we
+        # don't delete it, it keeps firing every minute forever.
+        _delete_cron_job(job_id)
+        logger.info(f"[poll] Deleted cron job {job_id} after task {task_id} completed as {final_status}")
 
     except Exception as e:
         # Global catch: if anything unexpected crashes, still clean up
@@ -583,6 +715,8 @@ def _poll_job_and_update_task(task_id: str, job_id: str, timeout_secs: int = EXE
                 _save(data)
         except Exception as save_err:
             logger.critical(f"[poll] FAILED to save error state for task={task_id}: {save_err}")
+        # Also try to delete the cron job on crash — prevents recurring zombies
+        _delete_cron_job(job_id)
     finally:
         # ALWAYS release the task lock, even on crash
         _release_task_lock(task_id)
@@ -637,6 +771,7 @@ async def execute_task(task_id: str):
         prompt = task.get("description", "") or task["title"]
         job_name = f"[task] {task['title'][:60]}"
         profile = task.get("profile", "default")
+        priority = task.get("priority", "medium")
         origin = {"profile": profile} if profile and profile != "default" else {}
 
         _cron = _import_cron_module("cron.jobs")
@@ -679,12 +814,20 @@ async def execute_task(task_id: str):
                     "to_status": "in_progress",
                     "details": {"cron_job_id": job_id, "trigger": "manual"},
                 })
+                # Enriched log entry: cron job dispatched and awaiting execution
+                t["history"].append({
+                    "timestamp": _now(),
+                    "action": "dispatched",
+                    "note": f"Cron job {job_id} created and triggered. Waiting for gateway ticker to execute...",
+                    "details": {"cron_job_id": job_id, "trigger": "manual", "priority": priority},
+                })
                 break
         data3["updated_at"] = _now()
         _save(data3)
 
     # Spawn background polling thread — runs independently after this returns
-    thread = threading.Thread(target=_poll_job_and_update_task, args=(task_id, job_id), daemon=True)
+    priority = task.get("priority", "medium")
+    thread = threading.Thread(target=_poll_job_and_update_task, args=(task_id, job_id), kwargs={"task_priority": priority}, daemon=True)
     thread.start()
 
     return {"ok": True, "cron_job_id": job_id, "message": "Execution started in background"}
@@ -706,80 +849,179 @@ async def execute_task_status(task_id: str):
     return {"executing": False, "status": "unknown"}
 
 
+@router.get("/{task_id}/execute/log")
+async def execute_task_log(task_id: str):
+    """Get the latest cron output for a task that is currently executing or recently completed.
+    Returns the raw text output from the cron job's output directory.
+    This endpoint powers the real-time progress view in the frontend.
+    """
+    # Find the task and its cron_job_id from history
+    data = _load_safe()
+    task = None
+    for t in data.get("tasks", []):
+        if t["id"] == task_id:
+            task = t
+            break
+    if not task:
+        raise HTTPException(404, "Task not found")
+
+    # Find the most recent cron_job_id from history
+    cron_job_id = None
+    for h in reversed(task.get("history", [])):
+        details = h.get("details") or {}
+        if details.get("cron_job_id"):
+            cron_job_id = details["cron_job_id"]
+            break
+
+    if not cron_job_id:
+        return {"task_id": task_id, "running": task.get("status") == "in_progress", "log": None, "output": None}
+
+    # Read cron output
+    output_text = None
+    job_out_dir = CRON_OUTPUT_DIR / cron_job_id
+    if job_out_dir.exists():
+        files = sorted(job_out_dir.iterdir())
+        if files:
+            try:
+                raw = files[-1].read_text()
+                # Truncate very large outputs for API response
+                output_text = raw[:8000] if len(raw) > 8000 else raw
+            except Exception:
+                pass
+
+    return {
+        "task_id": task_id,
+        "running": task.get("status") == "in_progress",
+        "cron_job_id": cron_job_id,
+        "log": output_text,
+        "output": output_text,
+        "status": task.get("status"),
+    }
+
+
 @router.post("/check-due")
 async def check_due_tasks():
     """
     Hermes cron calls this every minute to auto-execute tasks
     whose due_date has passed and are not done.
+
+    Uses the same async polling pipeline as manual /execute:
+    - Marks task as in_progress immediately
+    - Spawns a background polling thread
+    - Does NOT block the _data_lock or sleep synchronously
     """
+    now_utc = datetime.now(timezone.utc)
+    to_execute = []
     with _data_transaction():
         data = _load()
-        now = datetime.utcnow()
-        executed = []
         for task in data.get("tasks", []):
-            if task["status"] == "done" or not task.get("due_date"):
+            if task["status"] in ("done", "in_progress") or not task.get("due_date"):
                 continue
+            # Skip tasks already being tracked as executing
+            with _task_locks_lock:
+                if task["id"] in _task_locks:
+                    continue
 
-            due = datetime.fromisoformat(task["due_date"])
-            # If due_date is now or in the past (within 2-minute window)
-            if (now - due).total_seconds() <= 120:
-                try:
-                    # Execute the same pipeline as /execute
-                    prompt = task.get("description", "") or task["title"]
-                    job_name = f"[task] {task['title'][:60]}"
-                    profile = task.get("profile", "default")
-
-                    _cron = _import_cron_module("cron.jobs")
-                    create_job = _cron.create_job
-                    trigger_job = _cron.trigger_job
-                    get_job = _cron.get_job
-
-                    origin = {"profile": profile} if profile and profile != "default" else {}
-                    cron_job = create_job(
-                        prompt=prompt,
-                        schedule="* * * * *",
-                        name=job_name,
-                        deliver="local",
-                        origin=origin,
-                    )
-                    job_id = cron_job["id"]
-
-                    trigger_job(job_id)
-
-                    # Brief poll for output
-                    time_module.sleep(6)
-                    job_out_dir = CRON_OUTPUT_DIR / job_id
-                    output_text = None
-                    if job_out_dir.exists():
-                        files = sorted(job_out_dir.iterdir())
-                        if files:
-                            output_text = files[-1].read_text()
-
-                    # Update task
+            try:
+                due = datetime.fromisoformat(task["due_date"])
+                # If due_date is now or in the past (within 2-minute window)
+                if (now_utc - due).total_seconds() <= 120:
+                    # Mark as in_progress and record dispatch
+                    from_status = task["status"]
+                    task["status"] = "in_progress"
                     task["updated_at"] = _now()
-                    task["status"] = "done"
                     task["history"].append({
                         "timestamp": _now(),
-                        "action": "completed",
-                        "from_status": task["status"],
-                        "to_status": "done",
-                        "note": None,
-                        "details": {
-                            "cron_job_id": job_id,
-                            "trigger": "due_date",
-                            "output": output_text or "",
-                        },
+                        "action": "moved",
+                        "from_status": from_status,
+                        "to_status": "in_progress",
+                        "details": {"trigger": "due_date"},
                     })
-                    executed.append(task["id"])
-                except Exception as e:
-                    task["history"].append({
-                        "timestamp": _now(),
-                        "action": "auto_due_failed",
-                        "note": f"Auto-execute failed: {str(e)}",
+                    to_execute.append({
+                        "id": task["id"],
+                        "title": task["title"],
+                        "description": task.get("description", ""),
+                        "profile": task.get("profile", "default"),
+                        "priority": task.get("priority", "medium"),
                     })
+            except Exception:
+                pass  # Skip malformed tasks
 
-        data["updated_at"] = _now()
-        _save(data)
+        if to_execute:
+            data["updated_at"] = _now()
+            _save(data)
+
+    # Execute matched tasks outside the data lock
+    executed = []
+    for task_info in to_execute:
+        try:
+            prompt = task_info["description"] or task_info["title"]
+            job_name = f"[task] {task_info['title'][:60]}"
+            profile = task_info["profile"]
+            priority = task_info["priority"]
+            origin = {"profile": profile} if profile and profile != "default" else {}
+
+            _cron = _import_cron_module("cron.jobs")
+            cron_job = _cron.create_job(
+                prompt=prompt,
+                schedule="* * * * *",
+                name=job_name,
+                deliver="local",
+                origin=origin,
+            )
+            job_id = cron_job["id"]
+            _cron.trigger_job(job_id)
+
+            # Set up per-task lock tracking for the polling thread
+            _set_job_id(task_info["id"], job_id)
+
+            # Add dispatched history entry
+            with _data_transaction():
+                d = _load()
+                for t in d.get("tasks", []):
+                    if t["id"] == task_info["id"]:
+                        t["history"].append({
+                            "timestamp": _now(),
+                            "action": "dispatched",
+                            "note": f"Cron job {job_id} auto-triggered (due_date). Waiting for gateway ticker...",
+                            "details": {"cron_job_id": job_id, "trigger": "due_date", "priority": priority},
+                        })
+                        t["updated_at"] = _now()
+                        break
+                d["updated_at"] = _now()
+                _save(d)
+
+            # Spawn background polling thread (same as manual /execute)
+            thread = threading.Thread(
+                target=_poll_job_and_update_task,
+                args=(task_info["id"], job_id),
+                kwargs={"task_priority": priority},
+                daemon=True,
+            )
+            thread.start()
+            executed.append(task_info["id"])
+        except Exception as e:
+            # Mark as failed if dispatch fails
+            with _data_transaction():
+                d = _load()
+                for t in d.get("tasks", []):
+                    if t["id"] == task_info["id"]:
+                        orig_status = t.get("status", "in_progress")
+                        t["status"] = "failed"
+                        t["updated_at"] = _now()
+                        t["history"].append({
+                            "timestamp": _now(),
+                            "action": "failed",
+                            "from_status": orig_status,
+                            "to_status": "failed",
+                            "note": f"Auto-execute dispatch failed: {e}",
+                            "details": {"trigger": "due_date", "error": str(e)},
+                        })
+                        break
+                d["updated_at"] = _now()
+                _save(d)
+            _release_task_lock(task_info["id"])
+
     return {"executed": executed}
 
 
@@ -874,6 +1116,18 @@ async def list_archived():
     """List archived tasks."""
     data = _load_safe()
     return {"archived": data.get("archived", [])}
+
+
+@router.post("/purge-all-archived")
+async def purge_all_archived():
+    """Permanently delete all archived tasks."""
+    with _data_transaction():
+        data = _load()
+        count = len(data.get("archived", []))
+        data["archived"] = []
+        data["updated_at"] = _now()
+        _save(data)
+    return {"ok": True, "deleted_count": count}
 
 
 @router.post("/{task_id}/restore")
