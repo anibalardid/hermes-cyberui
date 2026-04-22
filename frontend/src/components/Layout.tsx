@@ -392,18 +392,20 @@ export default function Layout() {
             >
               <Menu size={20} />
             </button>
-            <div style={{
-              fontFamily: 'Orbitron, sans-serif',
-              fontWeight: 700,
-              fontSize: '0.875rem',
-              color: 'var(--primary)',
-            }}>HERMES</div>
-            <div style={{
-              fontSize: '0.45rem',
-              letterSpacing: '0.15em',
-              textTransform: 'uppercase',
-              color: 'var(--pink)',
-            }}>CyberUI</div>
+            <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none' }}>
+              <div style={{
+                fontFamily: 'Orbitron, sans-serif',
+                fontWeight: 700,
+                fontSize: '0.875rem',
+                color: 'var(--primary)',
+              }}>HERMES</div>
+              <div style={{
+                fontSize: '0.45rem',
+                letterSpacing: '0.15em',
+                textTransform: 'uppercase',
+                color: 'var(--pink)',
+              }}>CyberUI</div>
+            </Link>
           </div>
         )}
 

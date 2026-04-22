@@ -48,15 +48,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# CORS — allow all private/LAN origins dynamically (10.x, 172.16-31.x, 192.168.x, 100.x Tailscale, localhost, 127.x)
+import re
+_PRIVATE_ORIGIN_RE = re.compile(
+    r"^http://("
+    r"localhost|"
+    r"127\.\d+\.\d+\.\d+|"
+    r"10\.\d+\.\d+\.\d+|"
+    r"172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+|"
+    r"192\.168\.\d+\.\d+|"
+    r"100\.(6[4-9]|[7-9]\d|1[0-2]\d)\.\d+\.\d+"  # Tailscale CGNAT range 100.64-127.x.x
+    r"):\d+$"
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173", "http://127.0.0.1:5173",
-        "http://localhost:5174", "http://127.0.0.1:5174",
-        "http://localhost:4173",
-        "http://localhost:23689",
-    ],
+    allow_origin_regex=_PRIVATE_ORIGIN_RE.pattern,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
