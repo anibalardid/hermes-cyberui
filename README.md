@@ -1,3 +1,5 @@
+
+
 # Hermes CyberUI
 
 A cyberpunk-themed web interface for the Hermes Agent framework. Built with React + FastAPI, styled with a custom neon-dark aesthetic.
@@ -67,13 +69,12 @@ Backend runs on port **23689**. The frontend is built into `dist/` and served by
 **No configuration needed** — CyberUI reads everything from your existing Hermes installation (`~/.hermes/`). API keys, tokens, and provider settings are picked up automatically from Hermes' config.
 
 ```bash
-cd backend
-pip install -r requirements.txt
-./start.sh   # or: uvicorn main:app --reload --port 23689
+npm run install:all
+cd backend && pip install -r requirements.txt
 
-cd ../frontend
-npm install
+cd ..
 npm run build
+./start.sh   # or: npm run dev for hot-reload
 ```
 
 Access at: **http://localhost:23689**
